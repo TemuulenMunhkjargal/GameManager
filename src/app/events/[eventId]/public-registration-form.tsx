@@ -28,20 +28,21 @@ export function PublicRegistrationForm({ eventId }: PublicRegistrationFormProps)
     });
 
     const result = (await response.json()) as {
-      registration?: { status: string };
+      outcome?: "confirmed" | "waitlisted";
+      waitlistEntry?: { position: number };
       error?: string;
     };
 
     setIsSubmitting(false);
 
-    if (!response.ok || !result.registration) {
+    if (!response.ok || !result.outcome) {
       setError(result.error ?? "Unable to register.");
       return;
     }
 
     setMessage(
-      result.registration.status === "waitlisted"
-        ? "You are on the waitlist."
+      result.outcome === "waitlisted"
+        ? `You're on the waitlist at position #${result.waitlistEntry?.position ?? "?"}. We'll reach out if a seat opens up.`
         : "You are registered. See you at the table.",
     );
     router.refresh();

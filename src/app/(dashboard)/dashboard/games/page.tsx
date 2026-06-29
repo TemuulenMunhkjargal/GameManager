@@ -1,8 +1,11 @@
 import { Gamepad2, Plus } from "lucide-react";
-import { listGameSystems } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
-export default function GameSystemsPage() {
-  const systems = listGameSystems();
+
+export const dynamic = "force-dynamic";
+
+export default async function GameSystemsPage() {
+  const systems = await container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID);
 
   return (
     <>

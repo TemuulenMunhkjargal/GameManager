@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
-import { getEvent } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { PublicRegistrationForm } from "./public-registration-form";
+
+
+export const dynamic = "force-dynamic";
 
 type PublicEventPageProps = {
   params: Promise<{
@@ -11,7 +14,7 @@ type PublicEventPageProps = {
 
 export default async function PublicEventPage({ params }: PublicEventPageProps) {
   const { eventId } = await params;
-  const event = getEvent(eventId);
+  const event = await container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID);
 
   if (!event || event.visibility === "private") {
     notFound();
@@ -30,7 +33,7 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
 
         <section className="public-hero">
           <div>
-            <p className="eyebrow">{event.gameSystem}</p>
+            <p className="eyebrow">{event.gameSystemLabel}</p>
             <h1 className="page-title">{event.title}</h1>
             <p className="page-copy">{event.description}</p>
 
@@ -56,4 +59,3 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
     </main>
   );
 }
-

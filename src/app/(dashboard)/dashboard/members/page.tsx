@@ -1,9 +1,12 @@
 import { Mail, Phone, UserPlus } from "lucide-react";
-import { listMembers } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime } from "@/lib/format";
 
-export default function MembersPage() {
-  const members = listMembers();
+
+export const dynamic = "force-dynamic";
+
+export default async function MembersPage() {
+  const members = await container.members.listForOrganization(DEFAULT_ORGANIZATION_ID);
 
   return (
     <>
@@ -85,4 +88,3 @@ export default function MembersPage() {
     </>
   );
 }
-

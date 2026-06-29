@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEvent, listRegistrations } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
 type RouteContext = {
   params: Promise<{
@@ -9,15 +9,13 @@ type RouteContext = {
 
 export async function GET(_request: Request, context: RouteContext) {
   const { eventId } = await context.params;
-  const event = getEvent(eventId);
+  const event = await container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID);
 
   if (!event) {
     return NextResponse.json({ error: "Event not found." }, { status: 404 });
   }
 
-  return NextResponse.json({
-    event,
-    registrations: listRegistrations(eventId),
-  });
-}
+  const registrations = await container.registrations.listForEvent(eventId);
 
+  return NextResponse.json({ event, registrations });
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkInRegistration } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
 
 type RouteContext = {
   params: Promise<{
@@ -11,14 +11,23 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   const { eventId, registrationId } = await context.params;
 
-  try {
-    const registration = checkInRegistration(eventId, registrationId);
-    return NextResponse.json({ registration });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to check in attendee." },
-      { status: 400 },
-    );
-  }
-}
+  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
 
+  if (!actor) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
+  const result = await container.useCases.checkInRegistration.execute({
+    actorMembership: actor.membership,
+    eventId,
+    registrationId,
+  });
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 403 });
+  }
+
+  return NextResponse.json({
+    registration: { id: result.value.id, status: result.value.status },
+  });
+}

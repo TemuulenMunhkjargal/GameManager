@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { registerForEvent } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
 type RouteContext = {
   params: Promise<{
@@ -25,14 +25,35 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  try {
-    const registration = registerForEvent(eventId, parsed.data);
-    return NextResponse.json({ registration }, { status: 201 });
-  } catch (error) {
+  const result = await container.useCases.registerGuestForEvent.execute({
+    organizationId: DEFAULT_ORGANIZATION_ID,
+    eventId,
+    attendeeName: parsed.data.attendeeName,
+    attendeeEmail: parsed.data.attendeeEmail,
+  });
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  if (result.value.kind === "waitlisted") {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to register." },
-      { status: 400 },
+      {
+        outcome: "waitlisted",
+        waitlistEntry: {
+          id: result.value.waitlistEntry.id,
+          position: result.value.waitlistEntry.position,
+        },
+      },
+      { status: 201 },
     );
   }
-}
 
+  return NextResponse.json(
+    {
+      outcome: "confirmed",
+      registration: { id: result.value.registration.id, status: result.value.registration.status },
+    },
+    { status: 201 },
+  );
+}

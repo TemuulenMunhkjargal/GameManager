@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { CalendarPlus, ExternalLink } from "lucide-react";
-import { listEvents } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 
-export default function EventsPage() {
-  const events = listEvents();
+
+export const dynamic = "force-dynamic";
+
+export default async function EventsPage() {
+  const events = await container.events.listForOrganization(DEFAULT_ORGANIZATION_ID);
   const publishedEvents = events.filter((event) => event.status === "published");
   const totalRegistrations = events.reduce((total, event) => total + event.confirmedCount, 0);
   const totalCapacity = events.reduce((total, event) => total + event.capacity, 0);
@@ -66,7 +69,7 @@ export default function EventsPage() {
                   </Link>
                   <div>{event.venueName}</div>
                 </td>
-                <td>{event.gameSystem}</td>
+                <td>{event.gameSystemLabel}</td>
                 <td>{formatDateTime(event.startsAt)}</td>
                 <td>
                   <span className={event.confirmedCount >= event.capacity ? "badge danger" : "badge"}>
@@ -88,4 +91,3 @@ export default function EventsPage() {
     </>
   );
 }
-

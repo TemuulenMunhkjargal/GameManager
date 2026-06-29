@@ -1,7 +1,14 @@
-import { getOrganizationSettings } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
-export default function SettingsPage() {
-  const settings = getOrganizationSettings();
+
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const settings = await container.settings.get(DEFAULT_ORGANIZATION_ID);
+
+  if (!settings) {
+    return null;
+  }
 
   return (
     <>

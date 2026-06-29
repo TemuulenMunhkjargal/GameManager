@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { getEvent, listRegistrations } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { CheckInButton } from "./check-in-button";
+import { CancelButton } from "./cancel-button";
 
 type EventDetailPageProps = {
   params: Promise<{
@@ -13,19 +14,19 @@ type EventDetailPageProps = {
 
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
   const { eventId } = await params;
-  const event = getEvent(eventId);
+  const event = await container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID);
 
   if (!event) {
     notFound();
   }
 
-  const registrations = listRegistrations(eventId);
+  const registrations = await container.registrations.listForEvent(eventId);
 
   return (
     <>
       <div className="topbar">
         <div>
-          <p className="eyebrow">{event.gameSystem}</p>
+          <p className="eyebrow">{event.gameSystemLabel}</p>
           <h1 className="page-title">{event.title}</h1>
           <p className="page-copy">
             {formatDateTime(event.startsAt)} at {event.venueName}
@@ -57,19 +58,20 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                     <div>{registration.attendeeEmail}</div>
                   </div>
                   <div className="form-actions">
-                    <span
-                      className={
-                        registration.status === "waitlisted"
-                          ? "badge warning"
-                          : registration.status === "checked_in"
-                            ? "badge"
-                            : "badge"
-                      }
-                    >
-                      {registration.status.replace("_", " ")}
+                    <span className={registration.status === "waitlisted" ? "badge warning" : "badge"}>
+                      {registration.status === "waitlisted" && registration.waitlistPosition
+                        ? `waitlist #${registration.waitlistPosition}`
+                        : registration.status.replace("_", " ")}
                     </span>
                     {registration.status === "confirmed" ? (
                       <CheckInButton eventId={event.id} registrationId={registration.id} />
+                    ) : null}
+                    {registration.status === "confirmed" || registration.status === "waitlisted" ? (
+                      <CancelButton
+                        eventId={event.id}
+                        registrationId={registration.id}
+                        label={registration.status === "waitlisted" ? "Leave waitlist" : "Cancel"}
+                      />
                     ) : null}
                   </div>
                 </li>
@@ -101,4 +103,3 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     </>
   );
 }
-

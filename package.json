@@ -8,10 +8,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/infrastructure/db/seed.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
+    "better-auth": "latest",
+    "dotenv": "latest",
     "drizzle-orm": "latest",
     "lucide-react": "latest",
     "next": "^16.2.9",
@@ -31,6 +39,7 @@
     "eslint": "latest",
     "eslint-config-next": "latest",
     "tailwindcss": "latest",
+    "tsx": "latest",
     "typescript": "latest"
   }
 }

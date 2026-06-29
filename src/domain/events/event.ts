@@ -15,6 +15,7 @@ export class Event extends Entity<EventId> {
     id: EventId,
     public readonly organizationId: OrganizationId,
     public readonly title: string,
+    public readonly description: string,
     public readonly status: EventStatus,
     public readonly visibility: EventVisibility,
     public readonly startsAt: Date,
@@ -24,8 +25,11 @@ export class Event extends Entity<EventId> {
     public readonly waitlistEnabled: boolean,
     public readonly entryFee: Money | null,
     public readonly gameSystemId: GameSystemId | null,
+    public readonly gameSystemLabel: string,
     public readonly venueId: VenueId | null,
+    public readonly venueName: string,
     public readonly roomId: RoomId | null,
+    public readonly roomName: string | null,
   ) {
     super(id);
 

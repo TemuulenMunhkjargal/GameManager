@@ -117,6 +117,28 @@ button {
   padding: 28px;
 }
 
+.main-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--line);
+  background: #fffdf8;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+
 .topbar {
   display: flex;
   align-items: center;
@@ -172,6 +194,16 @@ button {
 
 .button.secondary:hover {
   background: #f3eee5;
+}
+
+.button.danger {
+  border: 1px solid #d44b3f;
+  background: transparent;
+  color: #d44b3f;
+}
+
+.button.danger:hover {
+  background: #fbeae8;
 }
 
 .grid {
