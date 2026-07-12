@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { ArrowRight, CalendarPlus } from "lucide-react";
-import { getDashboardSummary, listEvents, listGameSystems } from "@/lib/crit-table-store";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 
-export default function DashboardOverviewPage() {
-  const summary = getDashboardSummary();
-  const events = listEvents().slice(0, 4);
-  const gameSystems = listGameSystems().slice(0, 4);
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardOverviewPage() {
+  const summary = await container.dashboard.getSummary(DEFAULT_ORGANIZATION_ID);
+  const allEvents = await container.events.listForOrganization(DEFAULT_ORGANIZATION_ID);
+  const events = allEvents.slice(0, 4);
+  const gameSystems = (await container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID)).slice(
+    0,
+    4,
+  );
 
   return (
     <>
@@ -65,7 +72,7 @@ export default function DashboardOverviewPage() {
                       <Link href={`/dashboard/events/${event.id}`}>
                         <strong>{event.title}</strong>
                       </Link>
-                      <div>{event.gameSystem}</div>
+                      <div>{event.gameSystemLabel}</div>
                     </td>
                     <td>{formatDateTime(event.startsAt)}</td>
                     <td>

@@ -35,6 +35,23 @@ export class Registration extends Entity<RegistrationId> {
     );
   }
 
+  public confirmPayment(): Result<Registration> {
+    if (this.status !== "pending_payment") {
+      return failure("Only registrations awaiting payment can be confirmed by payment.");
+    }
+
+    return success(
+      new Registration(
+        this.id,
+        this.eventId,
+        this.memberProfileId,
+        "confirmed",
+        this.registeredAt,
+        this.checkedInAt,
+      ),
+    );
+  }
+
   public cancel(): Result<Registration> {
     if (this.status === "checked_in") {
       return failure("Checked-in registrations cannot be cancelled.");

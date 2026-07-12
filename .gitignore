@@ -1,10 +1,6 @@
-.next
 node_modules
-dist
-coverage
+.next
+*.log
 .env
 .env.local
-.env.*.local
-drizzle
-*.tsbuildinfo
-
+.env*.local

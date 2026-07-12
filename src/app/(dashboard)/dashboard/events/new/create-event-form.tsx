@@ -1,7 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { VenueSummaryDTO } from "@/application/venues/ports";
+
+const CUSTOM_VENUE = "__custom__";
 
 function toLocalInputValue(date: Date): string {
   const offset = date.getTimezoneOffset();
@@ -20,23 +23,46 @@ export function CreateEventForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [venues, setVenues] = useState<VenueSummaryDTO[]>([]);
+  const [selectedVenueId, setSelectedVenueId] = useState<string>(CUSTOM_VENUE);
+  const [venueNameFallback, setVenueNameFallback] = useState("Mana Vault Games");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/venues")
+      .then((r) => r.json())
+      .then((d: { venues: VenueSummaryDTO[] }) => {
+        setVenues(d.venues);
+        if (d.venues.length > 0) setSelectedVenueId(d.venues[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
+  const selectedVenue = venues.find((v) => v.id === selectedVenueId);
 
   async function onSubmit(formData: FormData) {
     setIsSubmitting(true);
     setError(null);
 
     const entryFeeDollars = Number(formData.get("entryFeeDollars") || 0);
+    const usingCustomVenue = selectedVenueId === CUSTOM_VENUE;
+
     const payload = {
       title: String(formData.get("title") || ""),
       description: String(formData.get("description") || ""),
       gameSystem: String(formData.get("gameSystem") || ""),
-      venueName: String(formData.get("venueName") || ""),
-      roomName: String(formData.get("roomName") || ""),
+      venueId: usingCustomVenue ? null : selectedVenueId,
+      venueName: usingCustomVenue ? venueNameFallback : (selectedVenue?.name ?? ""),
+      roomId: usingCustomVenue ? null : selectedRoomId || null,
+      roomName: usingCustomVenue
+        ? String(formData.get("roomNameFallback") || "")
+        : (selectedVenue?.rooms.find((r) => r.id === selectedRoomId)?.name ?? null),
       startsAt: new Date(String(formData.get("startsAt"))).toISOString(),
       endsAt: new Date(String(formData.get("endsAt"))).toISOString(),
       capacity: Number(formData.get("capacity") || 0),
       entryFeeInCents: Math.round(entryFeeDollars * 100),
       waitlistEnabled: formData.get("waitlistEnabled") === "on",
+      publishImmediately: formData.get("publishImmediately") !== "draft",
     };
 
     const response = await fetch("/api/events", {
@@ -90,12 +116,56 @@ export function CreateEventForm() {
           <input id="capacity" min="1" name="capacity" required type="number" defaultValue="16" />
         </div>
         <div className="field">
-          <label htmlFor="venueName">Venue</label>
-          <input id="venueName" name="venueName" required defaultValue="Mana Vault Games" />
+          <label htmlFor="venueId">Venue</label>
+          <select
+            id="venueId"
+            value={selectedVenueId}
+            onChange={(e) => {
+              setSelectedVenueId(e.target.value);
+              setSelectedRoomId("");
+            }}
+          >
+            {venues.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+            <option value={CUSTOM_VENUE}>Other (type manually)…</option>
+          </select>
+          {selectedVenueId === CUSTOM_VENUE ? (
+            <input
+              onChange={(e) => setVenueNameFallback(e.target.value)}
+              placeholder="Venue name"
+              required
+              style={{ marginTop: 8 }}
+              value={venueNameFallback}
+            />
+          ) : null}
         </div>
         <div className="field">
-          <label htmlFor="roomName">Room</label>
-          <input id="roomName" name="roomName" placeholder="Main Play Room" />
+          <label htmlFor="roomId">Room</label>
+          {selectedVenueId === CUSTOM_VENUE ? (
+            <input id="roomId" name="roomNameFallback" placeholder="Main Play Room (optional)" />
+          ) : (
+            <select
+              id="roomId"
+              onChange={(e) => setSelectedRoomId(e.target.value)}
+              value={selectedRoomId}
+            >
+              <option value="">No specific room</option>
+              {(selectedVenue?.rooms ?? []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                  {r.capacity ? ` (${r.capacity} seats)` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          {venues.length === 0 ? (
+            <p className="muted" style={{ marginTop: 4 }}>
+              No venues yet — add one on the Venues page, or type a name manually above.
+            </p>
+          ) : null}
         </div>
         <div className="field">
           <label htmlFor="startsAt">Starts</label>
@@ -138,11 +208,19 @@ export function CreateEventForm() {
       </div>
       {error ? <p className="error">{error}</p> : null}
       <div className="form-actions">
+        <button
+          className="button secondary"
+          disabled={isSubmitting}
+          name="publishImmediately"
+          type="submit"
+          value="draft"
+        >
+          {isSubmitting ? "Saving…" : "Save as draft"}
+        </button>
         <button className="button" disabled={isSubmitting} type="submit">
-          {isSubmitting ? "Creating..." : "Create event"}
+          {isSubmitting ? "Creating…" : "Publish now"}
         </button>
       </div>
     </form>
   );
 }
-

@@ -1,9 +1,17 @@
-import { Mail, Phone, UserPlus } from "lucide-react";
-import { listMembers } from "@/lib/crit-table-store";
+import { Download, Mail, Phone } from "lucide-react";
+import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
 import { formatDateTime } from "@/lib/format";
+import { AddMemberForm } from "./add-member-form";
 
-export default function MembersPage() {
-  const members = listMembers();
+export const dynamic = "force-dynamic";
+
+export default async function MembersPage() {
+  const [members, actor] = await Promise.all([
+    container.members.listForOrganization(DEFAULT_ORGANIZATION_ID),
+    resolveActor(DEFAULT_ORGANIZATION_ID),
+  ]);
+
+  const canManage = actor?.membership?.canManageEvents() ?? false;
 
   return (
     <>
@@ -16,10 +24,13 @@ export default function MembersPage() {
             real customer database.
           </p>
         </div>
-        <button className="button" type="button">
-          <UserPlus aria-hidden="true" size={18} />
-          Add member
-        </button>
+        <div className="form-actions">
+          <a className="button secondary" href="/api/members.csv">
+            <Download aria-hidden="true" size={16} />
+            Export CSV
+          </a>
+          {canManage ? <AddMemberForm /> : null}
+        </div>
       </div>
 
       <section className="grid columns-3" aria-label="Member stats">
@@ -85,4 +96,3 @@ export default function MembersPage() {
     </>
   );
 }
-

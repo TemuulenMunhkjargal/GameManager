@@ -1,0 +1,1 @@
+ALTER TABLE "game_systems" ADD COLUMN "status" text DEFAULT 'active' NOT NULL;

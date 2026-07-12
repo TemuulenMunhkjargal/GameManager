@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Gamepad2, LayoutDashboard, Settings, Users } from "lucide-react";
+import { CalendarDays, Gamepad2, LayoutDashboard, MapPin, Settings, Trophy, UserCog, Users } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },
   { href: "/dashboard/members", label: "Members", icon: Users },
   { href: "/dashboard/games", label: "Game Systems", icon: Gamepad2 },
+  { href: "/dashboard/venues", label: "Venues", icon: MapPin },
+  { href: "/dashboard/leagues", label: "Leagues", icon: Trophy },
+  { href: "/dashboard/team", label: "Team", icon: UserCog },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

@@ -28,22 +28,29 @@ export function PublicRegistrationForm({ eventId }: PublicRegistrationFormProps)
     });
 
     const result = (await response.json()) as {
-      registration?: { status: string };
+      outcome?: "confirmed" | "waitlisted";
+      registration?: { status: "pending_payment" | "confirmed" | "cancelled" | "checked_in" };
+      waitlistEntry?: { position: number };
       error?: string;
     };
 
     setIsSubmitting(false);
 
-    if (!response.ok || !result.registration) {
+    if (!response.ok || !result.outcome) {
       setError(result.error ?? "Unable to register.");
       return;
     }
 
-    setMessage(
-      result.registration.status === "waitlisted"
-        ? "You are on the waitlist."
-        : "You are registered. See you at the table.",
-    );
+    if (result.outcome === "waitlisted") {
+      setMessage(
+        `You're on the waitlist at position #${result.waitlistEntry?.position ?? "?"}. We'll reach out if a seat opens up.`,
+      );
+    } else if (result.registration?.status === "pending_payment") {
+      setMessage("You're on the list! Pay your entry fee at the door to confirm your seat.");
+    } else {
+      setMessage("You are registered. See you at the table.");
+    }
+
     router.refresh();
   }
 
