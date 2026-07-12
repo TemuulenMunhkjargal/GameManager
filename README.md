@@ -116,7 +116,7 @@ Locally, you can just call it yourself to test: `curl -X POST http://localhost:3
 
 ### Payments
 
-There's no Stripe integration yet — paid events are settled at the door (cash or card on a separate terminal) and staff mark the registration as paid from the event detail page in `/dashboard`. This still goes through the domain model (`Registration.confirmPayment()`, a real `payments` table row with `provider: "manual"`), so it's straightforward to add Stripe later as a second `PaymentRepository`/gateway without touching the use case that calls it.
+Will be done in-store, no third party involvement.
 
 ### Roles and permissions
 
