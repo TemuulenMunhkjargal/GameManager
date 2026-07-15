@@ -44,7 +44,7 @@ describe("desktop packaging", () => {
 
   it("publishes a stable installer asset from manual and tagged releases", () => {
     expect(releaseWorkflow).toContain("workflow_dispatch:");
-    expect(releaseWorkflow).toContain('tags:\n      - "v*"');
+    expect(releaseWorkflow).toContain('tags:\n    - "v*"');
     expect(releaseWorkflow).toContain("release/GameHall-Setup.exe");
     expect(releaseWorkflow).toContain("gh release create");
     expect(releaseWorkflow).not.toContain("if: startsWith(github.ref, 'refs/tags/')");
