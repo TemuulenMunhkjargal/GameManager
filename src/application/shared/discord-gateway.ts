@@ -8,10 +8,17 @@ export interface DiscordGateway {
     organizationName: string;
     eventTitle: string;
     gameSystemLabel: string;
-    venueName: string;
     eventDate: string;
     capacity: number;
     entryFeeInCents: number;
-    publicUrl: string;
+  }): Promise<void>;
+  sendLeagueAnnouncement(options: {
+    webhookUrl: string;
+    organizationName: string;
+    leagueName: string;
+    gameSystemLabel: string;
+    headline: string;
+    description: string;
+    fields?: { name: string; value: string; inline?: boolean }[];
   }): Promise<void>;
 }

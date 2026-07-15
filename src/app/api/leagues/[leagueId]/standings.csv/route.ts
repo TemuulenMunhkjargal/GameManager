@@ -20,8 +20,8 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const csv = toCsv(
-    ["Player", "Wins", "Losses", "Draws", "Points"],
-    league.standings.map((s) => [s.memberName, s.wins, s.losses, s.draws, s.points]),
+    ["Player", "Wins", "Losses", "Draws", "Bonus points", "Points"],
+    league.standings.map((s) => [s.memberName, s.wins, s.losses, s.draws, s.bonusPoints, s.points]),
   );
 
   const fileName = `${league.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-standings.csv`;

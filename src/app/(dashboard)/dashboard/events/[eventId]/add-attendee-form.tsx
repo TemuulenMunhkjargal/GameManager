@@ -1,0 +1,25 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { UserPlus } from "lucide-react";
+
+export function AddAttendeeForm({ eventId, players }: { eventId: string; players: { id: string; displayName: string }[] }) {
+  const router = useRouter();
+  const [playerId, setPlayerId] = useState(players[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setError(null);
+    const response = await fetch(`/api/events/${eventId}/registrations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberProfileId: playerId }) });
+    const body = await response.json().catch(() => ({})) as { error?: string }; setBusy(false);
+    if (!response.ok) { setError(body.error ?? "Unable to add player."); return; }
+    router.refresh();
+  }
+  if (!players.length) return <p className="muted">All active players are already on this event. Add more from Players.</p>;
+  return <form className="inline-line" onSubmit={submit}>
+    <select aria-label="Player" value={playerId} onChange={(event) => setPlayerId(event.target.value)}>{players.map((player) => <option key={player.id} value={player.id}>{player.displayName}</option>)}</select>
+    <button className="button secondary" disabled={busy || !playerId}><UserPlus size={16} />{busy ? "Adding..." : "Add player"}</button>
+    {error ? <span className="error">{error}</span> : null}
+  </form>;
+}

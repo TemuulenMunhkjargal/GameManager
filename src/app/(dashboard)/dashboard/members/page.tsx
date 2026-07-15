@@ -1,27 +1,29 @@
-import { Download, Mail, Phone } from "lucide-react";
+import { Download, Mail, Phone, Users } from "lucide-react";
 import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
 import { formatDateTime } from "@/lib/format";
 import { AddMemberForm } from "./add-member-form";
+import { DeleteMemberButton } from "./delete-member-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function MembersPage() {
-  const [members, actor] = await Promise.all([
+  const [members, actor, settings] = await Promise.all([
     container.members.listForOrganization(DEFAULT_ORGANIZATION_ID),
     resolveActor(DEFAULT_ORGANIZATION_ID),
+    container.settings.get(DEFAULT_ORGANIZATION_ID),
   ]);
 
   const canManage = actor?.membership?.canManageEvents() ?? false;
+  const activeMembers = members.filter((member) => member.status === "active");
 
   return (
     <>
       <div className="topbar">
         <div>
-          <p className="eyebrow">Community</p>
-          <h1 className="page-title">Members</h1>
+          <p className="eyebrow">Your group</p>
+          <h1 className="page-title">Players</h1>
           <p className="page-copy">
-            Track store regulars, event attendees, and player preferences before this becomes the
-            real customer database.
+            Keep the people you play with handy, including their favorite games and contact details.
           </p>
         </div>
         <div className="form-actions">
@@ -35,23 +37,23 @@ export default async function MembersPage() {
 
       <section className="grid columns-3" aria-label="Member stats">
         <div className="panel stat">
-          <p className="stat-label">Total members</p>
-          <p className="stat-value">{members.length}</p>
+          <p className="stat-label">Total players</p>
+          <p className="stat-value">{activeMembers.length}</p>
         </div>
         <div className="panel stat">
           <p className="stat-label">Active</p>
           <p className="stat-value">
-            {members.filter((member) => member.status === "active").length}
+            {activeMembers.length}
           </p>
         </div>
         <div className="panel stat">
           <p className="stat-label">With phone</p>
-          <p className="stat-value">{members.filter((member) => member.phone).length}</p>
+          <p className="stat-value">{activeMembers.filter((member) => member.phone).length}</p>
         </div>
       </section>
 
       <div className="toolbar">
-        <h2>Member directory</h2>
+        <h2>Player directory</h2>
       </div>
 
       <div className="panel table-wrap">
@@ -63,10 +65,22 @@ export default async function MembersPage() {
               <th>Contact</th>
               <th>Joined</th>
               <th>Status</th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
-            {members.map((member) => (
+            {activeMembers.length === 0 ? (
+              <tr>
+                <td colSpan={6}>
+                  <div className="empty-state compact">
+                    <Users aria-hidden="true" size={26} />
+                    <h3>Your player list is empty</h3>
+                    <p>Add someone you play with, or add guests while managing a game night.</p>
+                    {canManage ? <AddMemberForm /> : null}
+                  </div>
+                </td>
+              </tr>
+            ) : activeMembers.map((member) => (
               <tr key={member.id}>
                 <td>
                   <strong>{member.displayName}</strong>
@@ -84,10 +98,11 @@ export default async function MembersPage() {
                     </div>
                   ) : null}
                 </td>
-                <td>{formatDateTime(member.joinedAt)}</td>
+                <td>{formatDateTime(member.joinedAt, settings?.timezone)}</td>
                 <td>
                   <span className="badge">{member.status}</span>
                 </td>
+                <td><DeleteMemberButton memberId={member.id} name={member.displayName} /></td>
               </tr>
             ))}
           </tbody>

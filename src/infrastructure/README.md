@@ -1,14 +1,10 @@
 # Infrastructure
 
-This folder will hold concrete adapters for external tools and persistence.
+Concrete adapters used by the application:
 
-Planned adapters:
+- `db`: embedded SQLite initialization, Drizzle schema, and repositories
+- `email`: optional Resend or console email gateways
+- `discord`: optional webhook or console gateways
 
-- `db`: PostgreSQL and Drizzle schema/repositories
-- `auth`: Clerk or Better Auth session adapters
-- `email`: Resend email gateway
-- `payments`: Stripe payment gateway
-- `discord`: Discord webhook/bot adapter
-
-Domain and application code should depend on interfaces, not these concrete implementations.
-
+The database creates itself on first launch. Domain and application modules depend on interfaces,
+not these concrete adapters.

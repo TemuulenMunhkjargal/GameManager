@@ -4,7 +4,7 @@ const base = (content: string, previewText: string) => `
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CritTable</title>
+  <title>GameHall</title>
 </head>
 <body style="margin:0;padding:0;background:#f5f0e8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <span style="display:none;max-height:0;overflow:hidden;">${previewText}</span>
@@ -22,7 +22,7 @@ const base = (content: string, previewText: string) => `
                     <span style="color:#fff;font-weight:900;font-size:16px;line-height:36px;">CT</span>
                   </td>
                   <td style="padding-left:12px;vertical-align:middle;">
-                    <span style="font-weight:800;font-size:17px;color:#171717;">CritTable</span>
+                    <span style="font-weight:800;font-size:17px;color:#171717;">GameHall</span>
                   </td>
                 </tr>
               </table>
@@ -39,7 +39,7 @@ const base = (content: string, previewText: string) => `
           <!-- Footer -->
           <tr>
             <td style="padding-top:20px;text-align:center;color:#9c8f7a;font-size:13px;">
-              CritTable &mdash; event operations for local game stores
+              GameHall &mdash; your game nights, organized
             </td>
           </tr>
 
@@ -84,12 +84,12 @@ export function teamInviteEmail(options: {
   const roleFriendly = options.role.replace("_", " ");
 
   return {
-    subject: `You've been invited to ${options.organizationName} on CritTable`,
+    subject: `You've been invited to ${options.organizationName} on GameHall`,
     html: base(
       [
         heading(`You're invited to join ${options.organizationName}`),
         para(
-          `You've been given the <strong>${roleFriendly}</strong> role on CritTable, the event operations platform for ${options.organizationName}.`,
+          `You've been given the <strong>${roleFriendly}</strong> role on GameHall, the event operations platform for ${options.organizationName}.`,
         ),
         para("Create your account to accept the invitation and get access to the dashboard."),
         cta("Create account", options.signUpUrl),
@@ -239,16 +239,16 @@ export function emailVerificationEmail(options: {
   verificationUrl: string;
 }): { subject: string; html: string } {
   return {
-    subject: "Verify your CritTable email address",
+    subject: "Verify your GameHall email address",
     html: base(
       [
         heading(`Verify your email, ${options.name}`),
-        para("Confirm this is your email address to finish setting up your CritTable account."),
+        para("Confirm this is your email address to finish setting up your GameHall account."),
         cta("Verify email", options.verificationUrl),
         divider(),
-        para("If you didn't create a CritTable account, you can safely ignore this email."),
+        para("If you didn't create a GameHall account, you can safely ignore this email."),
       ].join(""),
-      "Confirm your email address to finish setting up your CritTable account.",
+      "Confirm your email address to finish setting up your GameHall account.",
     ),
   };
 }
@@ -258,18 +258,18 @@ export function passwordResetEmail(options: {
   resetUrl: string;
 }): { subject: string; html: string } {
   return {
-    subject: "Reset your CritTable password",
+    subject: "Reset your GameHall password",
     html: base(
       [
         heading(`Reset your password, ${options.name}`),
-        para("We received a request to reset your CritTable password. Click below to choose a new one."),
+        para("We received a request to reset your GameHall password. Click below to choose a new one."),
         cta("Reset password", options.resetUrl),
         divider(),
         para(
           "This link expires soon. If you didn't request a password reset, you can safely ignore this email — your password won't change.",
         ),
       ].join(""),
-      "Click the link to reset your CritTable password.",
+      "Click the link to reset your GameHall password.",
     ),
   };
 }

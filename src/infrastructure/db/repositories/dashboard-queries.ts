@@ -36,18 +36,19 @@ export class DrizzleDashboardQueries implements DashboardQueries {
       (registration) => registration.status === "checked_in",
     ).length;
 
-    const revenueInCents = events.reduce(
+    const upcoming = events.filter((event) => event.status !== "cancelled" && new Date(event.endsAt) >= now);
+    const revenueInCents = upcoming.reduce(
       (total, event) => total + event.entryFeeInCents * event.confirmedCount,
       0,
     );
 
     return {
-      upcomingEvents: events.filter((event) => new Date(event.startsAt) > now).length,
+      upcomingEvents: upcoming.length,
       activeMembers: members.filter((member) => member.status === "active").length,
       confirmedSeats,
       checkedInSeats,
       revenueInCents,
-      nextEvent: events[0] ?? null,
+      nextEvent: upcoming[0] ?? null,
     };
   }
 }

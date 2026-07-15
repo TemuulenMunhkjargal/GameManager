@@ -1,5 +1,5 @@
 import { WaitlistEntry } from "../../domain/registrations/waitlist-entry";
-import { failure, success, type Result } from "../../domain/shared/result";
+import { failure, type Result } from "../../domain/shared/result";
 import type { EventId } from "../../domain/events/event";
 import type { WaitlistRepository } from "./ports";
 

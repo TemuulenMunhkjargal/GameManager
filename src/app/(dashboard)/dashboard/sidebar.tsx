@@ -2,16 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Gamepad2, LayoutDashboard, MapPin, Settings, Trophy, UserCog, Users } from "lucide-react";
+import { CalendarDays, Gamepad2, LayoutDashboard, LayoutGrid, Settings, Trophy, Users } from "lucide-react";
+import Image from "next/image";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/events", label: "Events", icon: CalendarDays },
-  { href: "/dashboard/members", label: "Members", icon: Users },
-  { href: "/dashboard/games", label: "Game Systems", icon: Gamepad2 },
-  { href: "/dashboard/venues", label: "Venues", icon: MapPin },
+  { href: "/dashboard/members", label: "Players", icon: Users },
+  { href: "/dashboard/games", label: "Games", icon: Gamepad2 },
+  { href: "/dashboard/venues", label: "Tables", icon: LayoutGrid },
   { href: "/dashboard/leagues", label: "Leagues", icon: Trophy },
-  { href: "/dashboard/team", label: "Team", icon: UserCog },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -21,9 +21,9 @@ export function DashboardSidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark">CT</div>
-        <div className="brand-title">CritTable</div>
-        <div className="brand-subtitle">Store event operations</div>
+        <div className="brand-mark"><Image alt="GameHall" height={52} priority src="/gamehall-logo-192.png" width={52} /></div>
+        <div className="brand-title">GameHall</div>
+        <div className="brand-subtitle">Your game nights, organized</div>
       </div>
       <nav aria-label="Dashboard">
         <ul className="nav-list">

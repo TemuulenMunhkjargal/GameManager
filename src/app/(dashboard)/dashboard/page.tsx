@@ -8,8 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardOverviewPage() {
   const summary = await container.dashboard.getSummary(DEFAULT_ORGANIZATION_ID);
+  const settings = await container.settings.get(DEFAULT_ORGANIZATION_ID);
   const allEvents = await container.events.listForOrganization(DEFAULT_ORGANIZATION_ID);
-  const events = allEvents.slice(0, 4);
+  const now = new Date();
+  const events = allEvents.filter((event) => event.status !== "cancelled" && new Date(event.endsAt) >= now).slice(0, 4);
   const gameSystems = (await container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID)).slice(
     0,
     4,
@@ -20,10 +22,10 @@ export default async function DashboardOverviewPage() {
       <div className="topbar">
         <div>
           <p className="eyebrow">Overview</p>
-          <h1 className="page-title">Store operations</h1>
+          <h1 className="page-title">Your next game night</h1>
           <p className="page-copy">
-            A quick command center for upcoming events, registrations, check-ins, and the hobby
-            systems your store supports.
+            Plan sessions, keep track of players, and see what is coming up without any setup
+            ceremony.
           </p>
         </div>
         <Link className="button" href="/dashboard/events/new">
@@ -38,11 +40,11 @@ export default async function DashboardOverviewPage() {
           <p className="stat-value">{summary.upcomingEvents}</p>
         </div>
         <div className="panel stat">
-          <p className="stat-label">Active members</p>
+          <p className="stat-label">Players</p>
           <p className="stat-value">{summary.activeMembers}</p>
         </div>
         <div className="panel stat">
-          <p className="stat-label">Estimated entry revenue</p>
+          <p className="stat-label">Planned entry fees</p>
           <p className="stat-value">{formatMoney(summary.revenueInCents)}</p>
         </div>
       </section>
@@ -56,8 +58,18 @@ export default async function DashboardOverviewPage() {
               <ArrowRight aria-hidden="true" size={16} />
             </Link>
           </div>
-          <div className="table-wrap">
-            <table>
+          {events.length === 0 ? (
+            <div className="empty-state">
+              <CalendarPlus aria-hidden="true" size={28} />
+              <h3>Plan your first game night</h3>
+              <p>Pick a game, choose a time and place, then add the people you want at the table.</p>
+              <Link className="button" href="/dashboard/events/new">
+                Create a game night
+              </Link>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
               <thead>
                 <tr>
                   <th>Event</th>
@@ -74,7 +86,7 @@ export default async function DashboardOverviewPage() {
                       </Link>
                       <div>{event.gameSystemLabel}</div>
                     </td>
-                    <td>{formatDateTime(event.startsAt)}</td>
+                    <td>{formatDateTime(event.startsAt, settings?.timezone)}</td>
                     <td>
                       <span className="badge">
                         {event.confirmedCount}/{event.capacity}
@@ -83,8 +95,9 @@ export default async function DashboardOverviewPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          )}
         </section>
 
         <aside className="panel detail-panel">
@@ -100,6 +113,9 @@ export default async function DashboardOverviewPage() {
               </li>
             ))}
           </ul>
+          {gameSystems.length === 0 ? (
+            <p className="notice">Add a game when you create your first game night.</p>
+          ) : null}
         </aside>
       </div>
     </>

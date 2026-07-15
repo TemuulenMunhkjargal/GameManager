@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { parseDiscordWebhookUrl } from "@/lib/discord-webhook";
 
 const updateSettingsSchema = z.object({
   name: z.string().min(1),
-  contactEmail: z.string().email(),
+  contactEmail: z.union([z.literal(""), z.string().email()]),
   timezone: z.string().min(1),
   defaultVenueName: z.string().min(1),
   publicPageEnabled: z.boolean(),
@@ -27,6 +28,9 @@ export async function POST(request: Request) {
       { error: "Invalid settings.", issues: parsed.error.flatten() },
       { status: 400 },
     );
+  }
+  if (parsed.data.discordWebhookUrl && !parseDiscordWebhookUrl(parsed.data.discordWebhookUrl)) {
+    return NextResponse.json({ error: "The Discord webhook URL is not valid." }, { status: 400 });
   }
 
   const result = await container.useCases.updateOrganizationProfile.execute({

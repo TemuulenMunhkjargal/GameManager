@@ -1,5 +1,7 @@
 import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import Link from "next/link";
 import { SettingsForm } from "./settings-form";
+import { ThemeSelector } from "./theme-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +29,8 @@ export default async function SettingsPage() {
     );
   }
 
-  return (
+  return (<><nav aria-label="Settings sections" className="settings-tabs"><Link className="active" href="/dashboard/settings">General</Link><Link href="/dashboard/settings/backups">Backups</Link></nav>
     <SettingsForm
-      publicSlug={settings.publicSlug}
       initial={{
         name: settings.name,
         contactEmail: settings.contactEmail,
@@ -40,5 +41,6 @@ export default async function SettingsPage() {
         discordWebhookUrl: settings.discordWebhookUrl,
       }}
     />
-  );
+    <ThemeSelector />
+  </>);
 }

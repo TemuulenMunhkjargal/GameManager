@@ -1,1 +1,0 @@
-ALTER TABLE "organizations" ADD COLUMN "discord_webhook_url" text;

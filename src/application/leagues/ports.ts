@@ -1,4 +1,4 @@
-import type { League, LeagueId, LeagueStatus } from "../../domain/leagues/league";
+import type { League, LeagueFormat, LeagueId, LeagueStatus } from "../../domain/leagues/league";
 import type { LeagueStanding, LeagueStandingId } from "../../domain/leagues/league-standing";
 import type { OrganizationId } from "../../domain/organizations/organization";
 import type { MemberProfileId } from "../../domain/members/member-profile";
@@ -6,6 +6,7 @@ import type { MemberProfileId } from "../../domain/members/member-profile";
 export interface LeagueRepository {
   findById(leagueId: LeagueId, organizationId: OrganizationId): Promise<League | null>;
   save(league: League): Promise<void>;
+  delete(leagueId: LeagueId, organizationId: OrganizationId): Promise<boolean>;
 }
 
 export interface LeagueStandingRepository {
@@ -19,6 +20,7 @@ export type LeagueStandingDTO = {
   wins: number;
   losses: number;
   draws: number;
+  bonusPoints: number;
   points: number;
 };
 
@@ -27,6 +29,7 @@ export type LeagueSummaryDTO = {
   name: string;
   gameSystemLabel: string;
   description: string;
+  format: LeagueFormat;
   status: LeagueStatus;
   startsAt: string | null;
   endsAt: string | null;

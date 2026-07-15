@@ -1,12 +1,10 @@
 import type { Announcement } from "../../domain/communications/announcement";
-import { failure, success, type Result } from "../../domain/shared/result";
+import { failure, type Result } from "../../domain/shared/result";
 import type { EventRepository } from "../events/ports";
-import type { MemberRepository } from "../members/ports";
 import type { RegistrationQueries } from "../registrations/ports";
 import type { OrganizationRepository } from "../organizations/ports";
 import type { DiscordGateway } from "../shared/discord-gateway";
 import type { EmailGateway } from "../shared/email-gateway";
-import type { AnnouncementRepository } from "./ports";
 
 export class AnnouncementDeliveryService {
   public constructor(
@@ -22,10 +20,7 @@ export class AnnouncementDeliveryService {
    * returns the announcement transitioned to "sent". Does not persist —
    * callers are responsible for saving via their AnnouncementRepository.
    */
-  public async deliver(
-    announcement: Announcement,
-    options: { appBaseUrl: string },
-  ): Promise<Result<Announcement>> {
+  public async deliver(announcement: Announcement): Promise<Result<Announcement>> {
     if (!announcement.eventId) {
       return failure("Announcement has no associated event.");
     }
@@ -84,7 +79,6 @@ export class AnnouncementDeliveryService {
           organizationName: organization.name,
           eventTitle: event.title,
           gameSystemLabel: event.gameSystemLabel,
-          venueName: event.venueName,
           eventDate: event.startsAt.toLocaleDateString("en-US", {
             weekday: "long",
             month: "long",
@@ -95,7 +89,6 @@ export class AnnouncementDeliveryService {
           }),
           capacity: event.capacity,
           entryFeeInCents: event.entryFee?.amountInCents ?? 0,
-          publicUrl: `${options.appBaseUrl}/events/${event.id}`,
         });
       }
     }

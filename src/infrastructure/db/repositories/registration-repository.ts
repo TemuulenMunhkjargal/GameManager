@@ -69,6 +69,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository, Re
     const registrationRows = await this.db
       .select({
         id: registrations.id,
+        memberProfileId: registrations.memberProfileId,
         eventId: registrations.eventId,
         status: registrations.status,
         registeredAt: registrations.registeredAt,
@@ -85,6 +86,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository, Re
     const waitlistRows = await this.db
       .select({
         id: waitlistEntries.id,
+        memberProfileId: waitlistEntries.memberProfileId,
         eventId: waitlistEntries.eventId,
         position: waitlistEntries.position,
         joinedAt: waitlistEntries.joinedAt,
@@ -98,6 +100,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository, Re
     const summaries: RegistrationSummaryDTO[] = [
       ...registrationRows.map((row) => ({
         id: row.id,
+        memberProfileId: row.memberProfileId,
         eventId: row.eventId,
         attendeeName: row.attendeeName,
         attendeeEmail: row.attendeeEmail,
@@ -109,6 +112,7 @@ export class DrizzleRegistrationRepository implements RegistrationRepository, Re
       })),
       ...waitlistRows.map((row) => ({
         id: row.id,
+        memberProfileId: row.memberProfileId,
         eventId: row.eventId,
         attendeeName: row.attendeeName,
         attendeeEmail: row.attendeeEmail,
