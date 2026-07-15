@@ -6,6 +6,7 @@ const nextConfig = {
       ".git/**/*",
       ".crittable/**/*",
       ".gamehall/**/*",
+      "artifacts/**/*",
       "coverage/**/*",
       "docs/**/*",
       "electron/**/*",

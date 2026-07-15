@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")) as {
   version: string;
+  scripts: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   build: {
@@ -15,7 +16,9 @@ const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "ut
   };
 };
 const desktopPackage = JSON.parse(readFileSync(path.join(root, "electron", "package.json"), "utf8")) as { version: string };
+const nextConfig = readFileSync(path.join(root, "next.config.mjs"), "utf8");
 const readme = readFileSync(path.join(root, "README.md"), "utf8");
+const ciWorkflow = readFileSync(path.join(root, ".github", "workflows", "ci.yml"), "utf8");
 const releaseWorkflow = readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8")
   .replaceAll("\r\n", "\n");
 
@@ -31,9 +34,11 @@ describe("desktop packaging", () => {
 
   it("uses compact release settings and synchronized versions", () => {
     expect(packageJson.build.appId).toBe("com.gamehall.desktop");
+    expect(packageJson.scripts["desktop:build"]).toContain("--publish never");
     expect(packageJson.build.compression).toBe("maximum");
     expect(packageJson.build.electronLanguages).toEqual(["en-US"]);
     expect(desktopPackage.version).toBe(packageJson.version);
+    expect(nextConfig).toContain('"artifacts/**/*"');
   });
 
   it("keeps the public README focused on installing the desktop application", () => {
@@ -48,5 +53,13 @@ describe("desktop packaging", () => {
     expect(releaseWorkflow).toContain("release/GameHall-Setup.exe");
     expect(releaseWorkflow).toContain("gh release create");
     expect(releaseWorkflow).not.toContain("if: startsWith(github.ref, 'refs/tags/')");
+  });
+
+  it("uses Node 24-compatible GitHub actions", () => {
+    for (const workflow of [ciWorkflow, releaseWorkflow]) {
+      expect(workflow).toContain("actions/checkout@v6");
+      expect(workflow).toContain("actions/setup-node@v6");
+      expect(workflow).not.toMatch(/actions\/(?:checkout|setup-node)@v4/);
+    }
   });
 });
