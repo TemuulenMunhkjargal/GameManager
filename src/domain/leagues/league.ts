@@ -5,6 +5,19 @@ import type { GameSystemId } from "../game-systems/game-system";
 
 export type LeagueId = string;
 export type LeagueStatus = "draft" | "active" | "completed" | "archived";
+export type LeagueFormat =
+  | "match_play"
+  | "round_robin"
+  | "double_round_robin"
+  | "swiss"
+  | "swiss_top_cut"
+  | "single_elimination"
+  | "double_elimination"
+  | "ladder"
+  | "free_for_all"
+  | "points_series"
+  | "campaign"
+  | "open_play";
 
 export class League extends Entity<LeagueId> {
   public constructor(
@@ -14,6 +27,7 @@ export class League extends Entity<LeagueId> {
     public readonly gameSystemLabel: string,
     public readonly name: string,
     public readonly description: string,
+    public readonly format: LeagueFormat,
     public readonly status: LeagueStatus,
     public readonly startsAt: Date | null,
     public readonly endsAt: Date | null,
@@ -52,7 +66,7 @@ export class League extends Entity<LeagueId> {
   private withStatus(status: LeagueStatus): League {
     return new League(
       this.id, this.organizationId, this.gameSystemId, this.gameSystemLabel,
-      this.name, this.description, status, this.startsAt, this.endsAt,
+      this.name, this.description, this.format, status, this.startsAt, this.endsAt,
     );
   }
 }

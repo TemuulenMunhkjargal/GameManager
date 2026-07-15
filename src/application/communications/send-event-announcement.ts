@@ -20,7 +20,6 @@ export type SendEventAnnouncementCommand = {
   notifyDiscord: boolean;
   /** If set (and in the future), the announcement is scheduled instead of sent immediately. */
   scheduledFor: Date | null;
-  appBaseUrl: string;
 };
 
 export class SendEventAnnouncementUseCase {
@@ -81,7 +80,7 @@ export class SendEventAnnouncementUseCase {
       return success(scheduled.value);
     }
 
-    const sent = await this.delivery.deliver(draft, { appBaseUrl: command.appBaseUrl });
+    const sent = await this.delivery.deliver(draft);
 
     if (!sent.ok) {
       return sent;

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { CreateEventForm } from "./create-event-form";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
-export default function NewEventPage() {
+export default async function NewEventPage() {
+  const systems = await container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID);
   return (
     <>
       <div className="topbar">
@@ -9,7 +11,7 @@ export default function NewEventPage() {
           <p className="eyebrow">Event setup</p>
           <h1 className="page-title">Create event</h1>
           <p className="page-copy">
-            Publish a public signup page and start tracking registrations immediately.
+            Choose a game, time, and players for your next local game night.
           </p>
         </div>
         <Link className="button secondary" href="/dashboard/events">
@@ -18,7 +20,7 @@ export default function NewEventPage() {
       </div>
 
       <div className="panel form-panel">
-        <CreateEventForm />
+        <CreateEventForm systems={systems.map((system) => ({ id: system.id, name: system.name, defaultCapacity: system.defaultCapacity }))} />
       </div>
     </>
   );

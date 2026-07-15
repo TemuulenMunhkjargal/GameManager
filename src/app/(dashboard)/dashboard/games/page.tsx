@@ -19,7 +19,7 @@ export default async function GameSystemsPage() {
           <p className="eyebrow">Catalog</p>
           <h1 className="page-title">Game systems</h1>
           <p className="page-copy">
-            Configure the hobby systems your store runs so event setup can eventually inherit
+            Add the games your group plays so event setup can inherit
             formats, capacities, rules, and registration defaults.
           </p>
         </div>
@@ -61,11 +61,11 @@ export default async function GameSystemsPage() {
               </div>
               <div>
                 <h2>{system.name}</h2>
-                <p>{system.type.replace("_", " ")}</p>
+                <p>{system.type === "other" && system.notes.startsWith("Category: ") ? system.notes.split("\n")[0].slice(10) : system.type.replace("_", " ")}</p>
               </div>
               {system.status === "archived" ? <span className="badge warning">archived</span> : null}
             </div>
-            <p>{system.notes}</p>
+            <p>{system.type === "other" && system.notes.startsWith("Category: ") ? system.notes.split("\n").slice(1).join("\n") : system.notes}</p>
             <div className="metric-row">
               <span>
                 <strong>{system.defaultCapacity}</strong>

@@ -14,6 +14,7 @@ export type EventDetailsUpdate = {
   title: string;
   description: string;
   gameSystemLabel: string;
+  gameSystemId: GameSystemId | null;
   venueId: VenueId | null;
   venueName: string;
   roomId: RoomId | null;
@@ -148,7 +149,7 @@ export class Event extends Entity<EventId> {
         this.confirmedRegistrationCount,
         update.waitlistEnabled,
         update.entryFeeInCents > 0 ? Money.usd(update.entryFeeInCents) : null,
-        this.gameSystemId,
+        update.gameSystemId,
         update.gameSystemLabel.trim() || "Other",
         update.venueId,
         update.venueName.trim() || "Store",

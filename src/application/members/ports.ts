@@ -8,6 +8,7 @@ export interface MemberRepository {
   ): Promise<MemberProfile | null>;
   findById(memberProfileId: MemberProfileId): Promise<MemberProfile | null>;
   save(memberProfile: MemberProfile): Promise<void>;
+  delete(memberProfileId: MemberProfileId, organizationId: OrganizationId): Promise<boolean>;
 }
 
 export type MemberSummaryDTO = {

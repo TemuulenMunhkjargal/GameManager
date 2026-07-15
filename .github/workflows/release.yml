@@ -1,0 +1,78 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional release tag (for example v0.1.3). Defaults to the app version."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:coverage
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run desktop:build
+
+      - name: Prepare stable installer download
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "release/GameHall-Setup-*.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "The GameHall installer was not produced."
+          }
+          Copy-Item -LiteralPath $installer.FullName -Destination "release/GameHall-Setup.exe" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GameHall-Windows
+          path: release/GameHall-Setup.exe
+          if-no-files-found: error
+
+      - name: Resolve release tag
+        id: release
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "push") {
+            $tag = $env:GITHUB_REF_NAME
+          } else {
+            $tag = "${{ inputs.tag }}".Trim()
+            if ([string]::IsNullOrWhiteSpace($tag)) {
+              $package = Get-Content "electron/package.json" -Raw | ConvertFrom-Json
+              $tag = "v$($package.version)"
+            } elseif (-not $tag.StartsWith("v")) {
+              $tag = "v$tag"
+            }
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.release.outputs.tag }}"
+          $installer = (Resolve-Path "release/GameHall-Setup.exe").Path
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $installer --clobber
+          } else {
+            gh release create $tag $installer --target $env:GITHUB_SHA --title "GameHall $tag" --generate-notes
+          }

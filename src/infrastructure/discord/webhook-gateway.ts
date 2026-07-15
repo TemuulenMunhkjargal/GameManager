@@ -1,54 +1,28 @@
 import type { DiscordGateway } from "../../application/shared/discord-gateway";
 
-function formatMoney(cents: number): string {
-  return cents === 0 ? "Free" : `$${(cents / 100).toFixed(2)}`;
-}
+function formatMoney(cents: number): string { return cents === 0 ? "Free" : `$${(cents / 100).toFixed(2)}`; }
 
 export class WebhookDiscordGateway implements DiscordGateway {
-  public async sendEventAnnouncement(options: {
-    webhookUrl: string;
-    organizationName: string;
-    eventTitle: string;
-    gameSystemLabel: string;
-    venueName: string;
-    eventDate: string;
-    capacity: number;
-    entryFeeInCents: number;
-    publicUrl: string;
-  }): Promise<void> {
-    const payload = {
-      username: options.organizationName,
-      embeds: [
-        {
-          title: `🎲 ${options.eventTitle}`,
-          description: `A new event has been posted at **${options.organizationName}**. Grab your seat before it fills up!`,
-          color: 0x2d5016, // --accent-dark
-          fields: [
-            { name: "Game", value: options.gameSystemLabel, inline: true },
-            { name: "Venue", value: options.venueName, inline: true },
-            { name: "Date", value: options.eventDate, inline: false },
-            { name: "Capacity", value: `${options.capacity} seats`, inline: true },
-            { name: "Entry", value: formatMoney(options.entryFeeInCents), inline: true },
-          ],
-          url: options.publicUrl,
-          footer: { text: "Powered by CritTable" },
-        },
-      ],
-    };
+  public async sendEventAnnouncement(options: Parameters<DiscordGateway["sendEventAnnouncement"]>[0]): Promise<void> {
+    const url = new URL(options.webhookUrl); url.searchParams.set("wait", "true");
+    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      username: options.organizationName, allowed_mentions: { parse: [] }, embeds: [{ title: options.eventTitle,
+        description: `A new game night has been scheduled by **${options.organizationName}**.`, color: 0x71d09a,
+        fields: [{ name: "Game", value: options.gameSystemLabel, inline: true }, { name: "Date", value: options.eventDate, inline: false },
+          { name: "Capacity", value: `${options.capacity} seats`, inline: true }, { name: "Entry", value: formatMoney(options.entryFeeInCents), inline: true }],
+        footer: { text: "Powered by GameHall" } }] }) });
+    if (!response.ok) console.error("[WebhookDiscordGateway] Discord rejected announcement:", response.status);
+  }
 
-    const response = await fetch(options.webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      // Log but don't throw — Discord failure never breaks the primary action.
-      console.error(
-        "[WebhookDiscordGateway] webhook post failed:",
-        response.status,
-        await response.text().catch(() => ""),
-      );
-    }
+  public async sendLeagueAnnouncement(options: Parameters<DiscordGateway["sendLeagueAnnouncement"]>[0]): Promise<void> {
+    const url = new URL(options.webhookUrl); url.searchParams.set("wait", "true");
+    const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      username: options.organizationName, allowed_mentions: { parse: [] }, embeds: [{
+        title: options.headline, description: options.description, color: 0x71d09a,
+        fields: [{ name: "League", value: options.leagueName, inline: true }, { name: "Game", value: options.gameSystemLabel, inline: true }, ...(options.fields ?? [])],
+        footer: { text: "Powered by GameHall" },
+      }],
+    }) });
+    if (!response.ok) console.error("[WebhookDiscordGateway] Discord rejected league announcement:", response.status);
   }
 }

@@ -1,52 +1,24 @@
 # Module Boundaries
 
-## Domain Layer
+## Domain
 
-The domain layer owns business language and rules. It should not import React, Next.js, Drizzle, Stripe, Clerk, or any vendor SDK.
+Owns entities and rules such as event capacity, registration, waitlists, check-in, payments, and
+league standings. Table-session contracts live in the application layer and their atomic state
+transitions are implemented by the SQLite adapter. Domain code does not import React, Next.js,
+Drizzle, or integration SDKs.
 
-Examples:
+## Application
 
-- `Event.canRegister()`
-- `Registration.checkIn()`
-- `Membership.canManageEvents()`
-- `Payment.markPaid()`
+Coordinates one user action at a time through use cases such as `CreateEventUseCase`,
+`RegisterForEventUseCase`, and `CancelRegistrationUseCase`. It depends on repository and gateway
+interfaces rather than concrete technology.
 
-## Application Layer
+## Infrastructure
 
-The application layer coordinates use cases. It owns transaction flow, authorization, and calls to repositories or external ports.
+Implements persistence with embedded SQLite and Drizzle. Optional Resend and Discord adapters live
+here as well. Database initialization is idempotent and runs before repositories are exposed.
 
-Examples:
+## App
 
-- `CreateEventUseCase`
-- `RegisterForEventUseCase`
-- `CancelRegistrationUseCase`
-- `SendEventAnnouncementUseCase`
-
-## Infrastructure Layer
-
-The infrastructure layer implements ports using real technology.
-
-Examples:
-
-- `DrizzleEventRepository`
-- `StripePaymentGateway`
-- `ResendEmailGateway`
-- `ClerkCurrentUserProvider`
-
-## API Layer
-
-Next.js route handlers and server actions should be thin.
-
-They should:
-
-- Parse input.
-- Resolve the current user/session.
-- Call one use case.
-- Return a response or redirect.
-
-They should not:
-
-- Contain business rules.
-- Import database tables directly for complex workflows.
-- Call Stripe, email, or Discord SDKs directly.
-
+Contains Next.js pages and thin route handlers. Handlers validate input, call one use case, and
+translate the result into an HTTP response. They do not contain domain rules.

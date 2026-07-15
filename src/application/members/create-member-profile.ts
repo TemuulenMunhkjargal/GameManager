@@ -50,6 +50,7 @@ export class CreateMemberProfileUseCase {
       displayName,
       email,
       command.phone?.trim() || null,
+      command.favoriteGameSystem.trim() || "Unspecified",
       "active",
     );
 

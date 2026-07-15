@@ -1,157 +1,27 @@
-import {
-  boolean,
-  integer,
-  pgTable,
-  text,
-  timestamp,
-} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-/**
- * Drizzle schema. This is the only file that should know what the tables
- * actually look like in Postgres — application/domain code never imports
- * from here directly, only the repository classes in
- * `src/infrastructure/db/repositories/*` do.
- */
+const timestamp = (name: string) => integer(name, { mode: "timestamp" });
+const boolean = (name: string) => integer(name, { mode: "boolean" });
+const now = sql`(unixepoch())`;
 
-export const payments = pgTable("payments", {
-  id: text("id").primaryKey(),
-  registrationId: text("registration_id")
-    .notNull()
-    .references(() => registrations.id, { onDelete: "cascade" }),
-  amountInCents: integer("amount_in_cents").notNull(),
-  provider: text("provider", { enum: ["manual", "stripe"] }).notNull(),
-  status: text("status", {
-    enum: ["requires_payment", "paid", "failed", "refunded"],
-  }).notNull(),
-  providerReference: text("provider_reference"),
-  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-/**
- * Better Auth's required tables. These are managed by the auth library
- * itself (see src/infrastructure/auth/auth.ts) — application/domain code
- * never queries them directly. Domain code only ever sees a `UserId`
- * (== authUsers.id) and a Membership row, both via the application ports.
- */
-export const authUsers = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  image: text("image"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const authSessions = pgTable("session", {
-  id: text("id").primaryKey(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  token: text("token").notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  userId: text("user_id")
-    .notNull()
-    .references(() => authUsers.id, { onDelete: "cascade" }),
-});
-
-export const authAccounts = pgTable("account", {
-  id: text("id").primaryKey(),
-  accountId: text("account_id").notNull(),
-  providerId: text("provider_id").notNull(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => authUsers.id, { onDelete: "cascade" }),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  idToken: text("id_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
-  scope: text("scope"),
-  password: text("password"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const authVerifications = pgTable("verification", {
-  id: text("id").primaryKey(),
-  identifier: text("identifier").notNull(),
-  value: text("value").notNull(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-});
-
-// Better Auth's Drizzle adapter matches tables by these exact export names
-// when you pass the whole schema module to it (see src/infrastructure/auth/auth.ts).
-export const user = authUsers;
-export const session = authSessions;
-export const account = authAccounts;
-export const verification = authVerifications;
-
-/**
- * Domain table: a user's role inside an organization. References Better
- * Auth's `user` table for identity, but the role/permission logic lives
- * entirely in the Membership domain entity, not in the auth library.
- */
-export const memberships = pgTable("memberships", {
-  id: text("id").primaryKey(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  // Null while status = "invited" — claimed (set) once the invitee creates
-  // an account with a matching email.
-  userId: text("user_id").references(() => authUsers.id, { onDelete: "cascade" }),
-  invitedEmail: text("invited_email"),
-  role: text("role", {
-    enum: ["owner", "admin", "event_manager", "staff", "viewer"],
-  }).notNull(),
-  status: text("status", { enum: ["active", "invited", "suspended"] })
-    .notNull()
-    .default("active"),
-});
-
-export const organizations = pgTable("organizations", {
+export const organizations = sqliteTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   publicSlug: text("public_slug").notNull().unique(),
   type: text("type", {
     enum: ["game_store", "club", "convention_team", "community_group"],
-  })
-    .notNull()
-    .default("game_store"),
+  }).notNull().default("community_group"),
   timezone: text("timezone").notNull(),
-  contactEmail: text("contact_email").notNull(),
-  defaultVenueName: text("default_venue_name").notNull(),
+  contactEmail: text("contact_email").notNull().default(""),
+  defaultVenueName: text("default_venue_name").notNull().default(""),
   publicPageEnabled: boolean("public_page_enabled").notNull().default(true),
   waitlistsEnabledByDefault: boolean("waitlists_enabled_by_default").notNull().default(true),
   discordWebhookUrl: text("discord_webhook_url"),
-  status: text("status", { enum: ["active", "archived"] })
-    .notNull()
-    .default("active"),
-});
-
-export const venues = pgTable("venues", {
-  id: text("id").primaryKey(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  address: text("address"),
   status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
 });
 
-export const rooms = pgTable("rooms", {
-  id: text("id").primaryKey(),
-  venueId: text("venue_id")
-    .notNull()
-    .references(() => venues.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  capacity: integer("capacity"),
-});
-
-export const memberProfiles = pgTable("member_profiles", {
+export const memberProfiles = sqliteTable("member_profiles", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id")
     .notNull()
@@ -161,13 +31,44 @@ export const memberProfiles = pgTable("member_profiles", {
   email: text("email"),
   phone: text("phone"),
   favoriteGameSystem: text("favorite_game_system").notNull().default("Unspecified"),
-  status: text("status", { enum: ["active", "blocked", "archived"] })
-    .notNull()
-    .default("active"),
-  joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  status: text("status", { enum: ["active", "blocked", "archived"] }).notNull().default("active"),
+  joinedAt: timestamp("joined_at").notNull().default(now),
 });
 
-export const gameSystems = pgTable("game_systems", {
+export const gameTables = sqliteTable("game_tables", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organizations.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  capacity: integer("capacity").notNull().default(4),
+  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().default(now),
+});
+
+export const tableSessions = sqliteTable("table_sessions", {
+  id: text("id").primaryKey(),
+  tableId: text("table_id")
+    .notNull()
+    .references(() => gameTables.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at").notNull().default(now),
+  endedAt: timestamp("ended_at"),
+});
+
+export const tableSeats = sqliteTable("table_seats", {
+  id: text("id").primaryKey(),
+  sessionId: text("session_id")
+    .notNull()
+    .references(() => tableSessions.id, { onDelete: "cascade" }),
+  memberProfileId: text("member_profile_id").references(() => memberProfiles.id, {
+    onDelete: "set null",
+  }),
+  guestName: text("guest_name"),
+  seatedAt: timestamp("seated_at").notNull().default(now),
+  releasedAt: timestamp("released_at"),
+});
+
+export const gameSystems = sqliteTable("game_systems", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id")
     .notNull()
@@ -182,7 +83,7 @@ export const gameSystems = pgTable("game_systems", {
   status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
 });
 
-export const events = pgTable("events", {
+export const events = sqliteTable("events", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id")
     .notNull()
@@ -191,27 +92,27 @@ export const events = pgTable("events", {
   description: text("description").notNull().default(""),
   status: text("status", {
     enum: ["draft", "published", "cancelled", "completed"],
-  })
-    .notNull()
-    .default("draft"),
+  }).notNull().default("draft"),
   visibility: text("visibility", { enum: ["public", "unlisted", "private"] })
     .notNull()
     .default("public"),
-  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
-  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
   capacity: integer("capacity").notNull(),
   waitlistEnabled: boolean("waitlist_enabled").notNull().default(true),
   entryFeeInCents: integer("entry_fee_in_cents").notNull().default(0),
-  gameSystemId: text("game_system_id").references(() => gameSystems.id, { onDelete: "set null" }),
+  gameSystemId: text("game_system_id").references(() => gameSystems.id, {
+    onDelete: "set null",
+  }),
   gameSystemLabel: text("game_system_label").notNull().default("Other"),
   venueId: text("venue_id"),
-  venueName: text("venue_name").notNull().default("Store"),
+  venueName: text("venue_name").notNull().default(""),
   roomId: text("room_id"),
   roomName: text("room_name"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().default(now),
 });
 
-export const registrations = pgTable("registrations", {
+export const registrations = sqliteTable("registrations", {
   id: text("id").primaryKey(),
   eventId: text("event_id")
     .notNull()
@@ -222,11 +123,25 @@ export const registrations = pgTable("registrations", {
   status: text("status", {
     enum: ["pending_payment", "confirmed", "cancelled", "checked_in"],
   }).notNull(),
-  registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
-  checkedInAt: timestamp("checked_in_at", { withTimezone: true }),
+  registeredAt: timestamp("registered_at").notNull().default(now),
+  checkedInAt: timestamp("checked_in_at"),
 });
 
-export const announcements = pgTable("announcements", {
+export const payments = sqliteTable("payments", {
+  id: text("id").primaryKey(),
+  registrationId: text("registration_id")
+    .notNull()
+    .references(() => registrations.id, { onDelete: "cascade" }),
+  amountInCents: integer("amount_in_cents").notNull(),
+  provider: text("provider", { enum: ["manual"] }).notNull(),
+  status: text("status", {
+    enum: ["requires_payment", "paid", "failed", "refunded"],
+  }).notNull(),
+  providerReference: text("provider_reference"),
+  recordedAt: timestamp("recorded_at").notNull().default(now),
+});
+
+export const announcements = sqliteTable("announcements", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id")
     .notNull()
@@ -237,15 +152,17 @@ export const announcements = pgTable("announcements", {
   audience: text("audience", {
     enum: ["confirmed_attendees", "waitlisted", "all_attendees", "organization_members"],
   }).notNull(),
-  status: text("status", { enum: ["draft", "scheduled", "sent", "failed"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "scheduled", "sent", "failed"] })
+    .notNull()
+    .default("draft"),
   recipientCount: integer("recipient_count").notNull().default(0),
-  sentAt: timestamp("sent_at", { withTimezone: true }),
-  scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+  sentAt: timestamp("sent_at"),
+  scheduledFor: timestamp("scheduled_for"),
   notifyDiscord: boolean("notify_discord").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().default(now),
 });
 
-export const waitlistEntries = pgTable("waitlist_entries", {
+export const waitlistEntries = sqliteTable("waitlist_entries", {
   id: text("id").primaryKey(),
   eventId: text("event_id")
     .notNull()
@@ -257,27 +174,30 @@ export const waitlistEntries = pgTable("waitlist_entries", {
   status: text("status", { enum: ["waiting", "promoted", "withdrawn"] })
     .notNull()
     .default("waiting"),
-  joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+  joinedAt: timestamp("joined_at").notNull().default(now),
 });
 
-export const leagues = pgTable("leagues", {
+export const leagues = sqliteTable("leagues", {
   id: text("id").primaryKey(),
   organizationId: text("organization_id")
     .notNull()
     .references(() => organizations.id, { onDelete: "cascade" }),
-  gameSystemId: text("game_system_id").references(() => gameSystems.id, { onDelete: "set null" }),
+  gameSystemId: text("game_system_id").references(() => gameSystems.id, {
+    onDelete: "set null",
+  }),
   gameSystemLabel: text("game_system_label").notNull().default("Other"),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  format: text("format", { enum: ["match_play", "round_robin", "double_round_robin", "swiss", "swiss_top_cut", "single_elimination", "double_elimination", "ladder", "free_for_all", "points_series", "campaign", "open_play"] }).notNull().default("match_play"),
   status: text("status", { enum: ["draft", "active", "completed", "archived"] })
     .notNull()
     .default("draft"),
-  startsAt: timestamp("starts_at", { withTimezone: true }),
-  endsAt: timestamp("ends_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  startsAt: timestamp("starts_at"),
+  endsAt: timestamp("ends_at"),
+  createdAt: timestamp("created_at").notNull().default(now),
 });
 
-export const leagueStandings = pgTable("league_standings", {
+export const leagueStandings = sqliteTable("league_standings", {
   id: text("id").primaryKey(),
   leagueId: text("league_id")
     .notNull()
@@ -288,4 +208,5 @@ export const leagueStandings = pgTable("league_standings", {
   wins: integer("wins").notNull().default(0),
   losses: integer("losses").notNull().default(0),
   draws: integer("draws").notNull().default(0),
+  bonusPoints: integer("bonus_points").notNull().default(0),
 });

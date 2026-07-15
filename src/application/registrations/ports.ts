@@ -25,6 +25,7 @@ export interface WaitlistRepository {
 
 export type RegistrationSummaryDTO = {
   id: RegistrationId | WaitlistEntryId;
+  memberProfileId: MemberProfileId;
   eventId: EventId;
   attendeeName: string;
   attendeeEmail: string | null;

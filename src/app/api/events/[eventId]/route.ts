@@ -12,10 +12,7 @@ const updateEventSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(""),
   gameSystem: z.string().min(1),
-  venueId: z.string().optional().nullable(),
-  venueName: z.string().min(1),
-  roomId: z.string().optional().nullable(),
-  roomName: z.string().optional().nullable(),
+  gameSystemId: z.string().nullable().default(null),
   startsAt: z.string().min(1),
   endsAt: z.string().min(1),
   capacity: z.coerce.number().int().min(1).max(999),
@@ -62,10 +59,7 @@ export async function PUT(request: Request, context: RouteContext) {
     title: parsed.data.title,
     description: parsed.data.description,
     gameSystemLabel: parsed.data.gameSystem,
-    venueId: parsed.data.venueId ?? null,
-    venueName: parsed.data.venueName,
-    roomId: parsed.data.roomId ?? null,
-    roomName: parsed.data.roomName ?? null,
+    gameSystemId: parsed.data.gameSystemId,
     startsAt: new Date(parsed.data.startsAt),
     endsAt: new Date(parsed.data.endsAt),
     capacity: parsed.data.capacity,
@@ -80,5 +74,14 @@ export async function PUT(request: Request, context: RouteContext) {
   const event = await container.events.getDetail(result.value.id, DEFAULT_ORGANIZATION_ID);
 
   return NextResponse.json({ event });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const { eventId } = await context.params;
+  const event = await container.events.findByIdForOrganization(eventId, DEFAULT_ORGANIZATION_ID);
+  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
+  if (event.status !== "draft" && event.status !== "cancelled") return NextResponse.json({ error: "Cancel this event before deleting it." }, { status: 409 });
+  await container.events.delete(eventId, DEFAULT_ORGANIZATION_ID);
+  return NextResponse.json({ ok: true });
 }
 

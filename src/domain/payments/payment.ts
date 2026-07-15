@@ -4,7 +4,7 @@ import type { Money } from "../shared/money";
 import type { RegistrationId } from "../registrations/registration";
 
 export type PaymentId = string;
-export type PaymentProvider = "manual" | "stripe";
+export type PaymentProvider = "manual";
 export type PaymentStatus = "requires_payment" | "paid" | "failed" | "refunded";
 
 export class Payment extends Entity<PaymentId> {

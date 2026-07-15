@@ -63,6 +63,7 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       id: row.id,
       title: row.title,
       gameSystemLabel: row.gameSystemLabel,
+      gameSystemId: row.gameSystemId,
       venueName: row.venueName,
       startsAt: row.startsAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
@@ -114,6 +115,11 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       .insert(events)
       .values(values)
       .onConflictDoUpdate({ target: events.id, set: values });
+  }
+
+  public async delete(eventId: EventId, organizationId: OrganizationId): Promise<boolean> {
+    const removed = await this.db.delete(events).where(and(eq(events.id, eventId), eq(events.organizationId, organizationId))).returning({ id: events.id });
+    return removed.length > 0;
   }
 
   public async listForOrganization(organizationId: OrganizationId): Promise<EventSummaryDTO[]> {

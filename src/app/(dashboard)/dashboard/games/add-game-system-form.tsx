@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 
-const TYPES = ["tcg", "ttrpg", "miniatures", "board_game", "other"] as const;
+const TYPES = ["tcg", "ttrpg", "miniatures", "board_game"] as const;
 
 export function AddGameSystemForm() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState<(typeof TYPES)[number]>("tcg");
+  const [type, setType] = useState<(typeof TYPES)[number] | "custom">("tcg");
+  const [customType, setCustomType] = useState("");
   const [defaultCapacity, setDefaultCapacity] = useState(8);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,8 @@ export function AddGameSystemForm() {
     const response = await fetch("/api/game-systems", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, type, defaultCapacity, notes }),
+      body: JSON.stringify({ name, type: type === "custom" ? "other" : type,
+        defaultCapacity, notes: type === "custom" ? `Category: ${customType.trim()}\n${notes}`.trim() : notes }),
     });
 
     setIsSubmitting(false);
@@ -82,13 +84,16 @@ export function AddGameSystemForm() {
                 {option.replace("_", " ")}
               </option>
             ))}
+            <option value="custom">Type a different category...</option>
           </select>
+          {type === "custom" ? <input aria-label="Custom game category" placeholder="Enter a category" required value={customType} onChange={(e) => setCustomType(e.target.value)} /> : null}
         </div>
         <div className="field">
           <label htmlFor="game-capacity">Default capacity</label>
           <input
             id="game-capacity"
             min={1}
+            max={20}
             onChange={(e) => setDefaultCapacity(Number(e.target.value))}
             required
             type="number"

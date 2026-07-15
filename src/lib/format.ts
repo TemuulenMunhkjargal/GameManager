@@ -1,7 +1,8 @@
-export function formatDateTime(value: string): string {
+export function formatDateTime(value: string, timeZone?: string): string {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(new Date(value));
 }
 

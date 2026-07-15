@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { APP_BASE_URL, container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
@@ -51,7 +51,6 @@ export async function POST(req: Request, context: RouteContext) {
     audience: parsed.data.audience,
     notifyDiscord: parsed.data.notifyDiscord,
     scheduledFor: parsed.data.scheduledFor ? new Date(parsed.data.scheduledFor) : null,
-    appBaseUrl: APP_BASE_URL,
   });
 
   if (!result.ok) {

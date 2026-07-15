@@ -1,4 +1,4 @@
-import { and, eq, ilike } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { MemberProfile, type MemberProfileId } from "../../../domain/members/member-profile";
 import type { OrganizationId } from "../../../domain/organizations/organization";
 import type {
@@ -19,11 +19,16 @@ export class DrizzleMemberRepository implements MemberRepository, MemberQueries 
     const [row] = await this.db
       .select()
       .from(memberProfiles)
-      .where(and(eq(memberProfiles.organizationId, organizationId), ilike(memberProfiles.email, email)))
+      .where(
+        and(
+          eq(memberProfiles.organizationId, organizationId),
+          sql`lower(${memberProfiles.email}) = lower(${email})`,
+        ),
+      )
       .limit(1);
 
     return row
-      ? new MemberProfile(row.id, row.organizationId, row.userId, row.displayName, row.email, row.phone, row.status)
+      ? new MemberProfile(row.id, row.organizationId, row.userId, row.displayName, row.email, row.phone, row.favoriteGameSystem, row.status)
       : null;
   }
 
@@ -35,7 +40,7 @@ export class DrizzleMemberRepository implements MemberRepository, MemberQueries 
       .limit(1);
 
     return row
-      ? new MemberProfile(row.id, row.organizationId, row.userId, row.displayName, row.email, row.phone, row.status)
+      ? new MemberProfile(row.id, row.organizationId, row.userId, row.displayName, row.email, row.phone, row.favoriteGameSystem, row.status)
       : null;
   }
 
@@ -47,6 +52,7 @@ export class DrizzleMemberRepository implements MemberRepository, MemberQueries 
       displayName: memberProfile.displayName,
       email: memberProfile.email,
       phone: memberProfile.phone,
+      favoriteGameSystem: memberProfile.favoriteGameSystem,
       status: memberProfile.status,
     };
 
@@ -54,6 +60,13 @@ export class DrizzleMemberRepository implements MemberRepository, MemberQueries 
       .insert(memberProfiles)
       .values(values)
       .onConflictDoUpdate({ target: memberProfiles.id, set: values });
+  }
+
+  public async delete(memberProfileId: MemberProfileId, organizationId: OrganizationId): Promise<boolean> {
+    const archived = await this.db.update(memberProfiles).set({ status: "archived" })
+      .where(and(eq(memberProfiles.id, memberProfileId), eq(memberProfiles.organizationId, organizationId)))
+      .returning({ id: memberProfiles.id });
+    return archived.length > 0;
   }
 
   public async listForOrganization(organizationId: OrganizationId): Promise<MemberSummaryDTO[]> {

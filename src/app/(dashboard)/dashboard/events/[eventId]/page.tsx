@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Pencil, Download } from "lucide-react";
+import { Pencil, Download } from "lucide-react";
 import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { AttendeeList } from "./attendee-list";
 import { EventLifecycleButton } from "./event-lifecycle-button";
 import { AnnouncementForm } from "./announcement-form";
+import { AddAttendeeForm } from "./add-attendee-form";
+import { DeleteEventButton } from "./delete-event-button";
 
 type EventDetailPageProps = {
   params: Promise<{ eventId: string }>;
@@ -14,12 +16,13 @@ type EventDetailPageProps = {
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
   const { eventId } = await params;
 
-  const [event, registrations, actor, settings, announcementList] = await Promise.all([
+  const [event, registrations, actor, settings, announcementList, members] = await Promise.all([
     container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID),
     container.registrations.listForEvent(eventId),
     resolveActor(DEFAULT_ORGANIZATION_ID),
     container.settings.get(DEFAULT_ORGANIZATION_ID),
     container.announcements.listForEvent(eventId, DEFAULT_ORGANIZATION_ID),
+    container.members.listForOrganization(DEFAULT_ORGANIZATION_ID),
   ]);
 
   if (!event) {
@@ -37,8 +40,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           <p className="eyebrow">{event.gameSystemLabel}</p>
           <h1 className="page-title">{event.title}</h1>
           <p className="page-copy">
-            {formatDateTime(event.startsAt)} at {event.venueName}
-            {event.roomName ? `, ${event.roomName}` : ""}
+            {formatDateTime(event.startsAt, settings?.timezone)}
           </p>
         </div>
         <div className="form-actions">
@@ -57,12 +59,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           {canManage && event.status === "published" ? (
             <EventLifecycleButton action="cancel" eventId={event.id} />
           ) : null}
-          {event.status !== "cancelled" ? (
-            <Link className="button" href={`/events/${event.id}`}>
-              <ExternalLink aria-hidden="true" size={16} />
-              Public page
-            </Link>
-          ) : null}
+          {canManage && (event.status === "draft" || event.status === "cancelled") ? <DeleteEventButton eventId={event.id} name={event.title} /> : null}
         </div>
       </div>
 
@@ -87,6 +84,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </a>
               ) : null}
             </div>
+            {canManage && event.status === "published" ? <div style={{ marginBottom: 14 }}><AddAttendeeForm eventId={event.id} players={members.filter((member) => member.status === "active" && !registrations.some((registration) => registration.memberProfileId === member.id)).map((member) => ({ id: member.id, displayName: member.displayName }))} /></div> : null}
             <AttendeeList
               canManageBilling={canManageBilling}
               eventId={event.id}
@@ -115,7 +113,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                           <div className="muted">
                             {ann.audience.replace("_", " ")}
                             {ann.status === "scheduled" && ann.scheduledFor
-                              ? ` · sends ${formatDateTime(ann.scheduledFor)}`
+                              ? ` · sends ${formatDateTime(ann.scheduledFor, settings?.timezone)}`
                               : null}
                           </div>
                         </div>
@@ -170,7 +168,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
             <strong>Entry:</strong> {formatMoney(event.entryFeeInCents)}
           </p>
           <p>
-            <strong>Ends:</strong> {formatDateTime(event.endsAt)}
+            <strong>Ends:</strong> {formatDateTime(event.endsAt, settings?.timezone)}
           </p>
           <p>{event.description}</p>
         </aside>

@@ -10,7 +10,6 @@ export class SendDueAnnouncementsUseCase {
   public constructor(
     private readonly announcements: AnnouncementRepository,
     private readonly delivery: AnnouncementDeliveryService,
-    private readonly appBaseUrl: string,
   ) {}
 
   /**
@@ -25,7 +24,7 @@ export class SendDueAnnouncementsUseCase {
     let failed = 0;
 
     for (const announcement of due) {
-      const result = await this.delivery.deliver(announcement, { appBaseUrl: this.appBaseUrl });
+      const result = await this.delivery.deliver(announcement);
 
       if (result.ok) {
         await this.announcements.save(result.value);

@@ -49,10 +49,10 @@ export class Organization extends Entity<OrganizationId> {
     const defaultVenueName = update.defaultVenueName.trim();
 
     if (!name) {
-      return failure("Store name is required.");
+      return failure("Workspace name is required.");
     }
 
-    if (!contactEmail.includes("@")) {
+    if (contactEmail && !contactEmail.includes("@")) {
       return failure("A valid contact email is required.");
     }
 
