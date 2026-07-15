@@ -16,7 +16,8 @@ const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "ut
 };
 const desktopPackage = JSON.parse(readFileSync(path.join(root, "electron", "package.json"), "utf8")) as { version: string };
 const readme = readFileSync(path.join(root, "README.md"), "utf8");
-const releaseWorkflow = readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8");
+const releaseWorkflow = readFileSync(path.join(root, ".github", "workflows", "release.yml"), "utf8")
+  .replaceAll("\r\n", "\n");
 
 describe("desktop packaging", () => {
   it("does not duplicate root dependencies inside the Electron shell", () => {
