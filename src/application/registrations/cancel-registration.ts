@@ -1,17 +1,12 @@
 import { Registration } from "../../domain/registrations/registration";
-import type { Membership } from "../../domain/organizations/membership";
 import { failure, success, type Result } from "../../domain/shared/result";
 import type { EventId } from "../../domain/events/event";
 import type { RegistrationId } from "../../domain/registrations/registration";
 import type { EventRepository } from "../events/ports";
-import type { MemberRepository } from "../members/ports";
-import { requireEventManagement } from "../shared/authorization";
-import type { EmailGateway } from "../shared/email-gateway";
 import type { RegistrationRepository, WaitlistRepository } from "./ports";
 
 export type CancelRegistrationCommand = {
   organizationId: string;
-  actorMembership: Membership | null;
   eventId: EventId;
   registrationId: RegistrationId;
 };
@@ -26,18 +21,10 @@ export class CancelRegistrationUseCase {
     private readonly events: EventRepository,
     private readonly registrations: RegistrationRepository,
     private readonly waitlist: WaitlistRepository,
-    private readonly members: MemberRepository,
-    private readonly email: EmailGateway,
     private readonly createRegistrationId: () => string,
   ) {}
 
   public async execute(command: CancelRegistrationCommand): Promise<Result<CancelRegistrationOutcome>> {
-    const authorization = requireEventManagement(command.actorMembership);
-
-    if (!authorization.ok) {
-      return authorization;
-    }
-
     const registration = await this.registrations.findById(command.registrationId, command.eventId);
 
     if (!registration) {
@@ -79,31 +66,6 @@ export class CancelRegistrationUseCase {
     );
 
     await this.registrations.save(promotedRegistration);
-
-    // Fire-and-forget: email the promoted person
-    if (event) {
-      const promotedMember = await this.members.findById(nextInLine.memberProfileId);
-
-      if (promotedMember?.email) {
-        const eventDate = event.startsAt.toLocaleDateString("en-US", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        });
-
-        await this.email.sendWaitlistPromotion({
-          to: promotedMember.email,
-          attendeeName: promotedMember.displayName,
-          eventTitle: event.title,
-          eventDate,
-          venueName: event.venueName,
-          entryFeeInCents: event.entryFee?.amountInCents ?? 0,
-        });
-      }
-    }
 
     return success({ cancelled: cancelResult.value, promoted: promotedRegistration });
   }

@@ -1,13 +1,10 @@
 import { MemberProfile } from "../../domain/members/member-profile";
-import type { Membership } from "../../domain/organizations/membership";
 import type { OrganizationId } from "../../domain/organizations/organization";
 import { failure, success, type Result } from "../../domain/shared/result";
-import { requireEventManagement } from "../shared/authorization";
 import type { MemberRepository } from "./ports";
 
 export type CreateMemberProfileCommand = {
   organizationId: OrganizationId;
-  actorMembership: Membership | null;
   displayName: string;
   email: string | null;
   phone: string | null;
@@ -21,12 +18,6 @@ export class CreateMemberProfileUseCase {
   ) {}
 
   public async execute(command: CreateMemberProfileCommand): Promise<Result<MemberProfile>> {
-    const authorization = requireEventManagement(command.actorMembership);
-
-    if (!authorization.ok) {
-      return authorization;
-    }
-
     const displayName = command.displayName.trim();
 
     if (!displayName) {

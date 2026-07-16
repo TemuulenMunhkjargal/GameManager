@@ -11,14 +11,26 @@ import { SendEventAnnouncementUseCase } from "../application/communications/send
 import { AnnouncementDeliveryService } from "../application/communications/announcement-delivery-service";
 import { SendDueAnnouncementsUseCase } from "../application/communications/send-due-announcements";
 import { PublishEventUseCase, CancelEventUseCase } from "../application/events/event-lifecycle";
+import { ArchiveEventUseCase, MaintainEventArchiveUseCase } from "../application/events/event-archive";
 import { CreateMemberProfileUseCase } from "../application/members/create-member-profile";
-import { AwardLeaguePointsUseCase, CompleteLeagueUseCase, CreateLeagueUseCase, RecordLeagueResultUseCase, StartLeagueUseCase } from "../application/leagues/create-league";
+import {
+  AwardLeaguePointsUseCase,
+  CompleteLeagueUseCase,
+  CreateLeagueUseCase,
+  DeleteLeagueAdjustmentUseCase,
+  EnrollLeagueParticipantUseCase,
+  RecordFlexibleLeagueMatchUseCase,
+  RecordLeagueMatchUseCase,
+  RecordLeaguePodUseCase,
+  RemoveLeagueParticipantUseCase,
+  StartLeagueUseCase,
+  VoidLeagueMatchUseCase,
+} from "../application/leagues/create-league";
 import { DrizzleAnnouncementRepository } from "./db/repositories/announcement-repository";
 import { DrizzleLeagueRepository } from "./db/repositories/league-repository";
 import { UpdateOrganizationProfileUseCase } from "../application/organizations/update-organization-profile";
 import { CreateGameSystemUseCase } from "../application/game-systems/create-game-system";
 import { ArchiveGameSystemUseCase, RestoreGameSystemUseCase } from "../application/game-systems/archive-game-system";
-import { Membership } from "../domain/organizations/membership";
 import { db } from "./db/client";
 import { DrizzleEventRepository } from "./db/repositories/event-repository";
 import { DrizzleRegistrationRepository } from "./db/repositories/registration-repository";
@@ -30,14 +42,10 @@ import { DrizzleOrganizationRepository } from "./db/repositories/organization-re
 import { DrizzleOrganizationSettingsQueries } from "./db/repositories/organization-settings-queries";
 import { DrizzleDashboardQueries } from "./db/repositories/dashboard-queries";
 import { DrizzleTableRepository } from "./db/repositories/table-repository";
-import { emailGateway } from "./email/gateway-selection";
 import { WebhookDiscordGateway } from "./discord/webhook-gateway";
+import { createId } from "../lib/id";
 
 export const DEFAULT_ORGANIZATION_ID = "org_mana_vault";
-
-function createId(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
-}
 
 const eventRepository = new DrizzleEventRepository(db);
 const registrationRepository = new DrizzleRegistrationRepository(db);
@@ -51,19 +59,10 @@ const announcementRepository = new DrizzleAnnouncementRepository(db);
 const announcementDeliveryService = new AnnouncementDeliveryService(
   eventRepository,
   organizationRepository,
-  registrationRepository,
-  emailGateway,
   discordGateway,
 );
-const leagueRepository = new DrizzleLeagueRepository(db);
+const leagueRepository = new DrizzleLeagueRepository(db, createId);
 const tableRepository = new DrizzleTableRepository(db);
-const localOwnerMembership = new Membership(
-  "membership_local_owner",
-  DEFAULT_ORGANIZATION_ID,
-  "local_owner",
-  "owner",
-  "active",
-);
 
 export const container = {
   events: eventRepository,
@@ -93,35 +92,33 @@ export const container = {
       eventRepository,
       registrationRepository,
       waitlistRepository,
-      memberRepository,
-      emailGateway,
       () => createId("reg"),
     ),
     withdrawFromWaitlist: new WithdrawFromWaitlistUseCase(waitlistRepository),
     recordManualPayment: new RecordManualPaymentUseCase(
       eventRepository,
       registrationRepository,
-      memberRepository,
       paymentRepository,
-      emailGateway,
       () => createId("pay"),
     ),
-    refundPayment: new RefundPaymentUseCase(
-      eventRepository,
-      registrationRepository,
-      memberRepository,
-      paymentRepository,
-      emailGateway,
-    ),
+    refundPayment: new RefundPaymentUseCase(paymentRepository),
     updateEvent: new UpdateEventUseCase(eventRepository),
     publishEvent: new PublishEventUseCase(eventRepository),
     cancelEvent: new CancelEventUseCase(eventRepository),
+    archiveEvent: new ArchiveEventUseCase(eventRepository),
+    maintainEventArchive: new MaintainEventArchiveUseCase(eventRepository, eventRepository),
     createMemberProfile: new CreateMemberProfileUseCase(memberRepository, () => createId("member")),
     createLeague: new CreateLeagueUseCase(leagueRepository, () => createId("league")),
-    startLeague: new StartLeagueUseCase(leagueRepository),
-    completeLeague: new CompleteLeagueUseCase(leagueRepository),
-    recordLeagueResult: new RecordLeagueResultUseCase(leagueRepository, leagueRepository, memberRepository, () => createId("standing")),
-    awardLeaguePoints: new AwardLeaguePointsUseCase(leagueRepository, leagueRepository, memberRepository, () => createId("standing")),
+    enrollLeagueParticipant: new EnrollLeagueParticipantUseCase(leagueRepository, leagueRepository, memberRepository, () => createId("league_participant")),
+    removeLeagueParticipant: new RemoveLeagueParticipantUseCase(leagueRepository, leagueRepository),
+    startLeague: new StartLeagueUseCase(leagueRepository, leagueRepository),
+    completeLeague: new CompleteLeagueUseCase(leagueRepository, leagueRepository),
+    recordLeagueMatch: new RecordLeagueMatchUseCase(leagueRepository, leagueRepository),
+    recordFlexibleLeagueMatch: new RecordFlexibleLeagueMatchUseCase(leagueRepository, leagueRepository),
+    recordLeaguePod: new RecordLeaguePodUseCase(leagueRepository, leagueRepository),
+    awardLeaguePoints: new AwardLeaguePointsUseCase(leagueRepository, leagueRepository, () => createId("league_adjustment")),
+    deleteLeagueAdjustment: new DeleteLeagueAdjustmentUseCase(leagueRepository, leagueRepository),
+    voidLeagueMatch: new VoidLeagueMatchUseCase(leagueRepository, leagueRepository),
     sendEventAnnouncement: new SendEventAnnouncementUseCase(
       eventRepository,
       announcementRepository,
@@ -138,11 +135,3 @@ export const container = {
     restoreGameSystem: new RestoreGameSystemUseCase(gameSystemCatalog),
   },
 };
-
-export async function resolveActor(
-  organizationId: string,
-): Promise<{ membership: Membership | null }> {
-  return {
-    membership: organizationId === DEFAULT_ORGANIZATION_ID ? localOwnerMembership : null,
-  };
-}

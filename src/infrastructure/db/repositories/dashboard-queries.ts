@@ -1,9 +1,9 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { OrganizationId } from "../../../domain/organizations/organization";
 import type { DashboardQueries, DashboardSummaryDTO } from "../../../application/dashboard/ports";
 import type { EventQueries } from "../../../application/events/ports";
 import type { Database } from "../client";
-import { memberProfiles, registrations } from "../schema";
+import { memberProfiles } from "../schema";
 
 export class DrizzleDashboardQueries implements DashboardQueries {
   public constructor(
@@ -12,29 +12,18 @@ export class DrizzleDashboardQueries implements DashboardQueries {
   ) {}
 
   public async getSummary(organizationId: OrganizationId): Promise<DashboardSummaryDTO> {
-    const events = await this.eventQueries.listForOrganization(organizationId);
+    const [events, activeMemberRow] = await Promise.all([
+      this.eventQueries.listForOrganization(organizationId),
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(memberProfiles)
+        .where(and(
+          eq(memberProfiles.organizationId, organizationId),
+          eq(memberProfiles.status, "active"),
+        ))
+        .limit(1),
+    ]);
     const now = new Date();
-
-    const members = await this.db
-      .select({ id: memberProfiles.id, status: memberProfiles.status })
-      .from(memberProfiles)
-      .where(eq(memberProfiles.organizationId, organizationId));
-
-    const memberIds = members.map((member) => member.id);
-
-    const memberRegistrations = memberIds.length
-      ? await this.db
-          .select({ status: registrations.status })
-          .from(registrations)
-          .where(inArray(registrations.memberProfileId, memberIds))
-      : [];
-
-    const confirmedSeats = memberRegistrations.filter(
-      (registration) => registration.status === "confirmed" || registration.status === "checked_in",
-    ).length;
-    const checkedInSeats = memberRegistrations.filter(
-      (registration) => registration.status === "checked_in",
-    ).length;
 
     const upcoming = events.filter((event) => event.status !== "cancelled" && new Date(event.endsAt) >= now);
     const revenueInCents = upcoming.reduce(
@@ -43,12 +32,9 @@ export class DrizzleDashboardQueries implements DashboardQueries {
     );
 
     return {
-      upcomingEvents: upcoming.length,
-      activeMembers: members.filter((member) => member.status === "active").length,
-      confirmedSeats,
-      checkedInSeats,
+      upcomingEvents: upcoming,
+      activeMemberCount: Number(activeMemberRow[0]?.count ?? 0),
       revenueInCents,
-      nextEvent: upcoming[0] ?? null,
     };
   }
 }

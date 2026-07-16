@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS events (
   venue_name TEXT NOT NULL DEFAULT '',
   room_id TEXT,
   room_name TEXT,
+  archived_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
@@ -138,17 +139,65 @@ CREATE TABLE IF NOT EXISTS leagues (
   status TEXT NOT NULL DEFAULT 'draft',
   starts_at INTEGER,
   ends_at INTEGER,
+  configured_rounds INTEGER NOT NULL DEFAULT 0,
+  top_cut_size INTEGER NOT NULL DEFAULT 4,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
-CREATE TABLE IF NOT EXISTS league_standings (
+CREATE TABLE IF NOT EXISTS league_participants (
   id TEXT PRIMARY KEY,
   league_id TEXT NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
   member_profile_id TEXT NOT NULL REFERENCES member_profiles(id) ON DELETE CASCADE,
+  seed INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  enrolled_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  UNIQUE (league_id, member_profile_id)
+);
+
+CREATE TABLE IF NOT EXISTS league_rounds (
+  id TEXT PRIMARY KEY,
+  league_id TEXT NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
+  number INTEGER NOT NULL,
+  stage TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  label TEXT NOT NULL,
+  completed_at INTEGER,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  UNIQUE (league_id, number)
+);
+
+CREATE TABLE IF NOT EXISTS league_matches (
+  id TEXT PRIMARY KEY,
+  league_id TEXT NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
+  round_id TEXT REFERENCES league_rounds(id) ON DELETE CASCADE,
+  sequence INTEGER NOT NULL,
+  stage TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled',
+  label TEXT NOT NULL DEFAULT '',
+  completed_at INTEGER,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE TABLE IF NOT EXISTS league_match_entries (
+  id TEXT PRIMARY KEY,
+  match_id TEXT NOT NULL REFERENCES league_matches(id) ON DELETE CASCADE,
+  participant_id TEXT NOT NULL REFERENCES league_participants(id) ON DELETE CASCADE,
+  score INTEGER,
+  placement INTEGER,
+  outcome TEXT,
+  UNIQUE (match_id, participant_id)
+);
+
+CREATE TABLE IF NOT EXISTS league_stat_adjustments (
+  id TEXT PRIMARY KEY,
+  league_id TEXT NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
+  participant_id TEXT NOT NULL REFERENCES league_participants(id) ON DELETE CASCADE,
   wins INTEGER NOT NULL DEFAULT 0,
   losses INTEGER NOT NULL DEFAULT 0,
   draws INTEGER NOT NULL DEFAULT 0,
-  bonus_points INTEGER NOT NULL DEFAULT 0
+  points INTEGER NOT NULL DEFAULT 0,
+  reason TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
 CREATE INDEX IF NOT EXISTS events_organization_idx ON events(organization_id);
@@ -158,9 +207,15 @@ CREATE INDEX IF NOT EXISTS waitlist_event_idx ON waitlist_entries(event_id);
 CREATE INDEX IF NOT EXISTS game_tables_organization_idx ON game_tables(organization_id);
 CREATE INDEX IF NOT EXISTS table_sessions_table_idx ON table_sessions(table_id, ended_at);
 CREATE INDEX IF NOT EXISTS table_seats_session_idx ON table_seats(session_id, released_at);
+CREATE INDEX IF NOT EXISTS league_participants_league_idx ON league_participants(league_id, seed);
+CREATE INDEX IF NOT EXISTS league_rounds_league_idx ON league_rounds(league_id, number);
+CREATE INDEX IF NOT EXISTS league_matches_league_idx ON league_matches(league_id, created_at);
+CREATE INDEX IF NOT EXISTS league_matches_round_idx ON league_matches(round_id, sequence);
+CREATE INDEX IF NOT EXISTS league_match_entries_participant_idx ON league_match_entries(participant_id);
+CREATE INDEX IF NOT EXISTS league_stat_adjustments_league_idx ON league_stat_adjustments(league_id, created_at);
 `;
 
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 
 const migrations: { version: number; migrate: (sqlite: Sqlite.Database) => void }[] = [
   {
@@ -177,8 +232,61 @@ const migrations: { version: number; migrate: (sqlite: Sqlite.Database) => void 
         sqlite.exec("ALTER TABLE leagues ADD COLUMN format TEXT NOT NULL DEFAULT 'match_play'");
       }
       const standingColumns = sqlite.pragma("table_info(league_standings)") as { name: string }[];
-      if (!standingColumns.some((column) => column.name === "bonus_points")) {
+      if (standingColumns.length > 0 && !standingColumns.some((column) => column.name === "bonus_points")) {
         sqlite.exec("ALTER TABLE league_standings ADD COLUMN bonus_points INTEGER NOT NULL DEFAULT 0");
+      }
+    },
+  },
+  {
+    version: 3,
+    migrate: (sqlite) => {
+      const eventColumns = sqlite.pragma("table_info(events)") as { name: string }[];
+      if (!eventColumns.some((column) => column.name === "archived_at")) {
+        sqlite.exec("ALTER TABLE events ADD COLUMN archived_at INTEGER");
+      }
+
+      const leagueColumns = sqlite.pragma("table_info(leagues)") as { name: string }[];
+      if (!leagueColumns.some((column) => column.name === "configured_rounds")) {
+        sqlite.exec("ALTER TABLE leagues ADD COLUMN configured_rounds INTEGER NOT NULL DEFAULT 0");
+      }
+      if (!leagueColumns.some((column) => column.name === "top_cut_size")) {
+        sqlite.exec("ALTER TABLE leagues ADD COLUMN top_cut_size INTEGER NOT NULL DEFAULT 4");
+      }
+
+      const legacyTable = sqlite.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'league_standings'",
+      ).get();
+      if (legacyTable) {
+        sqlite.exec(`
+          INSERT OR IGNORE INTO league_participants (
+            id, league_id, member_profile_id, seed, status, enrolled_at
+          )
+          SELECT
+            'participant_legacy_' || id,
+            league_id,
+            member_profile_id,
+            ROW_NUMBER() OVER (PARTITION BY league_id ORDER BY id),
+            'active',
+            unixepoch()
+          FROM league_standings;
+
+          INSERT OR IGNORE INTO league_stat_adjustments (
+            id, league_id, participant_id, wins, losses, draws, points, reason, created_at
+          )
+          SELECT
+            'adjustment_legacy_' || id,
+            league_id,
+            'participant_legacy_' || id,
+            wins,
+            losses,
+            draws,
+            wins * 3 + draws + bonus_points,
+            'Imported from the previous aggregate standings system',
+            unixepoch()
+          FROM league_standings;
+
+          DROP TABLE league_standings;
+        `);
       }
     },
   },

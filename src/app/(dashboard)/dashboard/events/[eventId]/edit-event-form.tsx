@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { EventDetailDTO } from "@/application/events/ports";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 function toLocalInputValue(iso: string): string { const date = new Date(iso); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 
@@ -10,16 +11,21 @@ export function EditEventForm({ event }: { event: EventDetailDTO }) {
   const router = useRouter(); const [error, setError] = useState<string | null>(null); const [isSubmitting, setIsSubmitting] = useState(false);
   async function onSubmit(formData: FormData) {
     setIsSubmitting(true); setError(null);
-    const payload = { title: String(formData.get("title") || ""), description: String(formData.get("description") || ""),
-      gameSystem: String(formData.get("gameSystem") || ""),
-      gameSystemId: event.gameSystemId,
-      startsAt: new Date(String(formData.get("startsAt"))).toISOString(), endsAt: new Date(String(formData.get("endsAt"))).toISOString(),
-      capacity: Number(formData.get("capacity") || 0), entryFeeInCents: Math.round(Number(formData.get("entryFeeDollars") || 0) * 100),
-      waitlistEnabled: formData.get("waitlistEnabled") === "on" };
-    const response = await fetch(`/api/events/${event.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const result = await response.json() as { event?: { id: string }; error?: string }; setIsSubmitting(false);
-    if (!response.ok || !result.event) { setError(result.error ?? "Unable to update event."); return; }
-    router.push(`/dashboard/events/${event.id}`); router.refresh();
+    try {
+      const payload = { title: String(formData.get("title") || ""), description: String(formData.get("description") || ""),
+        gameSystem: String(formData.get("gameSystem") || ""),
+        gameSystemId: event.gameSystemId,
+        startsAt: new Date(String(formData.get("startsAt"))).toISOString(), endsAt: new Date(String(formData.get("endsAt"))).toISOString(),
+        capacity: Number(formData.get("capacity") || 0), entryFeeInCents: Math.round(Number(formData.get("entryFeeDollars") || 0) * 100),
+        waitlistEnabled: formData.get("waitlistEnabled") === "on" };
+      const result = await requestJson<{ event?: { id: string } }>(`/api/events/${event.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!result.event) throw new Error("GameHall did not return the updated event.");
+      router.push(`/dashboard/events/${event.id}`); router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to update event."));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
   return <form action={onSubmit}><div className="form-grid">
     <div className="field full"><label htmlFor="title">Event title</label><input id="title" name="title" required defaultValue={event.title} /></div>

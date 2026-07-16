@@ -1,89 +1,77 @@
 "use client";
 
+import { Clock, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Send, Clock } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type AnnouncementFormProps = {
   eventId: string;
   hasDiscordWebhook: boolean;
 };
 
-const AUDIENCES = [
-  { value: "confirmed_attendees", label: "Confirmed attendees" },
-  { value: "all_attendees", label: "Confirmed + waitlisted" },
-  { value: "waitlisted", label: "Waitlist only" },
-] as const;
+type AnnouncementResponse = {
+  announcement: { deliveredToDiscord: boolean; status: string };
+};
 
 function defaultScheduleValue(): string {
   const date = new Date();
   date.setHours(date.getHours() + 1, 0, 0, 0);
   const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60 * 1000);
-  return local.toISOString().slice(0, 16);
+  return new Date(date.getTime() - offset * 60 * 1000).toISOString().slice(0, 16);
 }
 
 export function AnnouncementForm({ eventId, hasDiscordWebhook }: AnnouncementFormProps) {
   const router = useRouter();
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [audience, setAudience] = useState<(typeof AUDIENCES)[number]["value"]>(
-    "confirmed_attendees",
-  );
-  const [notifyDiscord, setNotifyDiscord] = useState(hasDiscordWebhook);
   const [sendMode, setSendMode] = useState<"now" | "schedule">("now");
   const [scheduledFor, setScheduledFor] = useState(defaultScheduleValue());
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<{ count: number; scheduled: boolean } | null>(null);
+  const [result, setResult] = useState<"posted" | "scheduled" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setIsSubmitting(true);
     setError(null);
     setResult(null);
 
-    const response = await fetch(`/api/events/${eventId}/announce`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject,
-        body,
-        audience,
-        notifyDiscord,
-        scheduledFor: sendMode === "schedule" ? new Date(scheduledFor).toISOString() : null,
-      }),
-    });
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(data?.error ?? "Failed to send announcement.");
-      return;
+    try {
+      const data = await requestJson<AnnouncementResponse>(`/api/events/${eventId}/announce`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject,
+          body,
+          scheduledFor: sendMode === "schedule" ? new Date(scheduledFor).toISOString() : null,
+        }),
+      });
+      setResult(data.announcement.status === "scheduled" ? "scheduled" : "posted");
+      setSubject("");
+      setBody("");
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to post the Discord announcement."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const data = (await response.json()) as {
-      announcement: { recipientCount: number; status: string };
-    };
-
-    setResult({
-      count: data.announcement.recipientCount,
-      scheduled: data.announcement.status === "scheduled",
-    });
-    setSubject("");
-    setBody("");
-    router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit}>
+      {!hasDiscordWebhook ? (
+        <p className="notice">
+          Connect a Discord channel in <a href="/dashboard/settings">Settings</a> before posting announcements.
+        </p>
+      ) : null}
       <div className="form-grid">
         <div className="field full">
-          <label htmlFor="ann-subject">Subject</label>
+          <label htmlFor="ann-subject">Discord post title</label>
           <input
+            disabled={!hasDiscordWebhook}
             id="ann-subject"
-            onChange={(e) => setSubject(e.target.value)}
+            onChange={(event) => setSubject(event.target.value)}
             required
             value={subject}
           />
@@ -91,8 +79,9 @@ export function AnnouncementForm({ eventId, hasDiscordWebhook }: AnnouncementFor
         <div className="field full">
           <label htmlFor="ann-body">Message</label>
           <textarea
+            disabled={!hasDiscordWebhook}
             id="ann-body"
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(event) => setBody(event.target.value)}
             required
             rows={5}
             style={{ resize: "vertical" }}
@@ -100,85 +89,45 @@ export function AnnouncementForm({ eventId, hasDiscordWebhook }: AnnouncementFor
           />
         </div>
         <div className="field">
-          <label htmlFor="ann-audience">Audience</label>
-          <select
-            id="ann-audience"
-            onChange={(e) =>
-              setAudience(e.target.value as (typeof AUDIENCES)[number]["value"])
-            }
-            value={audience}
-          >
-            {AUDIENCES.map((a) => (
-              <option key={a.value} value={a.value}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
           <label htmlFor="ann-timing">When</label>
           <select
+            disabled={!hasDiscordWebhook}
             id="ann-timing"
-            onChange={(e) => setSendMode(e.target.value as "now" | "schedule")}
+            onChange={(event) => setSendMode(event.target.value as "now" | "schedule")}
             value={sendMode}
           >
-            <option value="now">Send now</option>
+            <option value="now">Post now</option>
             <option value="schedule">Schedule for later</option>
           </select>
         </div>
         {sendMode === "schedule" ? (
           <div className="field">
-            <label htmlFor="ann-scheduled-for">Send at</label>
+            <label htmlFor="ann-scheduled-for">Post at</label>
             <input
+              disabled={!hasDiscordWebhook}
               id="ann-scheduled-for"
               min={defaultScheduleValue()}
-              onChange={(e) => setScheduledFor(e.target.value)}
+              onChange={(event) => setScheduledFor(event.target.value)}
               type="datetime-local"
               value={scheduledFor}
             />
-          </div>
-        ) : null}
-        {hasDiscordWebhook ? (
-          <div className="field" style={{ alignSelf: "end", paddingBottom: 8 }}>
-            <label className="inline-line">
-              <input
-                checked={notifyDiscord}
-                onChange={(e) => setNotifyDiscord(e.target.checked)}
-                type="checkbox"
-              />
-              Also post to Discord
-            </label>
           </div>
         ) : null}
       </div>
 
       {error ? <p className="notice error">{error}</p> : null}
       {result ? (
-        <p className="notice">
-          {result.scheduled ? (
-            "Announcement scheduled."
-          ) : (
-            <>
-              Sent to <strong>{result.count}</strong> recipient{result.count !== 1 ? "s" : ""}.
-            </>
-          )}
+        <p className="notice success">
+          {result === "scheduled" ? "Discord announcement scheduled." : "Announcement posted to Discord."}
         </p>
       ) : null}
 
       <div className="form-actions" style={{ marginTop: 12 }}>
-        <button className="button" disabled={isSubmitting} type="submit">
-          {sendMode === "schedule" ? (
-            <Clock aria-hidden="true" size={16} />
-          ) : (
-            <Send aria-hidden="true" size={16} />
-          )}
+        <button className="button" disabled={isSubmitting || !hasDiscordWebhook} type="submit">
+          {sendMode === "schedule" ? <Clock aria-hidden="true" size={16} /> : <Send aria-hidden="true" size={16} />}
           {isSubmitting
-            ? sendMode === "schedule"
-              ? "Scheduling…"
-              : "Sending…"
-            : sendMode === "schedule"
-              ? "Schedule announcement"
-              : "Send announcement"}
+            ? sendMode === "schedule" ? "Scheduling…" : "Posting…"
+            : sendMode === "schedule" ? "Schedule Discord post" : "Post to Discord"}
         </button>
       </div>
     </form>

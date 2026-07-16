@@ -3,6 +3,7 @@
 import { Archive } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 export function DeleteMemberButton({ memberId, name }: { memberId: string; name: string }) {
   const router = useRouter();
@@ -11,10 +12,14 @@ export function DeleteMemberButton({ memberId, name }: { memberId: string; name:
   async function remove() {
     if (!window.confirm(`Archive ${name}? Their event and league history will be preserved.`)) return;
     setBusy(true); setError(null);
-    const response = await fetch(`/api/members/${memberId}`, { method: "DELETE" });
-    setBusy(false);
-    if (!response.ok) { const body = await response.json().catch(() => ({})) as { error?: string }; setError(body.error ?? "Unable to archive player."); return; }
-    router.refresh();
+    try {
+      await requestJson(`/api/members/${memberId}`, { method: "DELETE" });
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to archive player."));
+    } finally {
+      setBusy(false);
+    }
   }
   return <div><button aria-label={`Archive ${name}`} className="icon-button danger-icon" disabled={busy} onClick={remove} title="Archive player and preserve history" type="button"><Archive size={16} /></button>{error ? <span className="row-error">{error}</span> : null}</div>;
 }

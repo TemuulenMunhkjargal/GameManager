@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Banknote } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type MarkPaidButtonProps = {
   eventId: string;
@@ -18,20 +19,14 @@ export function MarkPaidButton({ eventId, registrationId }: MarkPaidButtonProps)
     setIsSubmitting(true);
     setError(null);
 
-    const response = await fetch(
-      `/api/events/${eventId}/registrations/${registrationId}/mark-paid`,
-      { method: "POST" },
-    );
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Unable to record payment.");
-      return;
+    try {
+      await requestJson(`/api/events/${eventId}/registrations/${registrationId}/mark-paid`, { method: "POST" });
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to record payment."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.refresh();
   }
 
   return (

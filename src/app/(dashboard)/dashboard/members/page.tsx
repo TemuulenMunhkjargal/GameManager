@@ -1,5 +1,5 @@
 import { Download, Mail, Phone, Users } from "lucide-react";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime } from "@/lib/format";
 import { AddMemberForm } from "./add-member-form";
 import { DeleteMemberButton } from "./delete-member-button";
@@ -7,13 +7,11 @@ import { DeleteMemberButton } from "./delete-member-button";
 export const dynamic = "force-dynamic";
 
 export default async function MembersPage() {
-  const [members, actor, settings] = await Promise.all([
+  const [members, settings] = await Promise.all([
     container.members.listForOrganization(DEFAULT_ORGANIZATION_ID),
-    resolveActor(DEFAULT_ORGANIZATION_ID),
     container.settings.get(DEFAULT_ORGANIZATION_ID),
   ]);
 
-  const canManage = actor?.membership?.canManageEvents() ?? false;
   const activeMembers = members.filter((member) => member.status === "active");
 
   return (
@@ -31,7 +29,7 @@ export default async function MembersPage() {
             <Download aria-hidden="true" size={16} />
             Export CSV
           </a>
-          {canManage ? <AddMemberForm /> : null}
+          <AddMemberForm />
         </div>
       </div>
 
@@ -76,7 +74,7 @@ export default async function MembersPage() {
                     <Users aria-hidden="true" size={26} />
                     <h3>Your player list is empty</h3>
                     <p>Add someone you play with, or add guests while managing a game night.</p>
-                    {canManage ? <AddMemberForm /> : null}
+                    <AddMemberForm />
                   </div>
                 </td>
               </tr>

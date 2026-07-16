@@ -4,7 +4,7 @@ import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { ScheduleCalendar } from "../schedule-calendar";
 import { ScheduleViewToggle } from "../schedule-view-toggle";
-import { splitArchivedEvents } from "@/lib/event-archive";
+import { isEventArchived } from "@/application/events/event-archive";
 
 
 export const dynamic = "force-dynamic";
@@ -12,10 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function EventsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const [events, settings] = await Promise.all([container.events.listForOrganization(DEFAULT_ORGANIZATION_ID), container.settings.get(DEFAULT_ORGANIZATION_ID)]);
   const view = (await searchParams).view === "calendar" ? "calendar" : "list";
-  const archived = splitArchivedEvents(events);
-  if (archived.expired.length) await Promise.all(archived.expired.map((event) => container.events.delete(event.id, DEFAULT_ORGANIZATION_ID)));
-  const archivedIds = new Set([...archived.retained, ...archived.expired].map((event) => event.id));
-  const currentEvents = events.filter((event) => !archivedIds.has(event.id));
+  const currentEvents = events.filter((event) => !isEventArchived(event));
   const publishedEvents = currentEvents.filter((event) => event.status === "published");
   const totalRegistrations = currentEvents.reduce((total, event) => total + event.confirmedCount, 0);
   const totalCapacity = currentEvents.reduce((total, event) => total + event.capacity, 0);

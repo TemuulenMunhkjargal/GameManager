@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
 const createGameSystemSchema = z.object({
   name: z.string().min(1),
@@ -16,12 +16,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
-
-  if (!actor) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  }
-
   const body = await request.json();
   const parsed = createGameSystemSchema.safeParse(body);
 
@@ -34,7 +28,6 @@ export async function POST(request: Request) {
 
   const result = await container.useCases.createGameSystem.execute({
     organizationId: DEFAULT_ORGANIZATION_ID,
-    actorMembership: actor.membership,
     name: parsed.data.name,
     type: parsed.data.type,
     defaultCapacity: parsed.data.defaultCapacity,
@@ -42,7 +35,7 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 403 });
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   return NextResponse.json({ gameSystem: { id: result.value.id, name: result.value.name } }, { status: 201 });

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type ArchiveGameSystemButtonProps = {
   gameSystemId: string;
@@ -17,20 +18,16 @@ export function ArchiveGameSystemButton({ gameSystemId, isArchived }: ArchiveGam
     setIsSubmitting(true);
     setError(null);
 
-    const response = await fetch(
-      `/api/game-systems/${gameSystemId}/${isArchived ? "restore" : "archive"}`,
-      { method: "POST" },
-    );
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Unable to update.");
-      return;
+    try {
+      await requestJson(`/api/game-systems/${gameSystemId}/${isArchived ? "restore" : "archive"}`, {
+        method: "POST",
+      });
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to update."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.refresh();
   }
 
   return (

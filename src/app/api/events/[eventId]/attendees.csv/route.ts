@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { toCsv } from "@/lib/csv";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
   const { eventId } = await context.params;
-
-  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
-
-  if (!actor || !actor.membership?.canManageEvents()) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  }
 
   const event = await container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID);
 

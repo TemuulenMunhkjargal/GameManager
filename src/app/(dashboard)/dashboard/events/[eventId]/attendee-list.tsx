@@ -8,20 +8,22 @@ import { CheckInButton } from "./check-in-button";
 import { CancelButton } from "./cancel-button";
 import { MarkPaidButton } from "./mark-paid-button";
 import { RefundButton } from "./refund-button";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type AttendeeListProps = {
   eventId: string;
   registrations: RegistrationSummaryDTO[];
   canManageBilling: boolean;
+  readOnly?: boolean;
 };
 
-export function AttendeeList({ eventId, registrations, canManageBilling }: AttendeeListProps) {
+export function AttendeeList({ eventId, registrations, canManageBilling, readOnly = false }: AttendeeListProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectableIds = registrations
+  const selectableIds = readOnly ? [] : registrations
     .filter((r) => r.status === "confirmed")
     .map((r) => r.id);
 
@@ -44,22 +46,19 @@ export function AttendeeList({ eventId, registrations, canManageBilling }: Atten
     setIsSubmitting(true);
     setError(null);
 
-    const response = await fetch(`/api/events/${eventId}/bulk-check-in`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registrationIds: Array.from(selected) }),
-    });
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Unable to check in selected attendees.");
-      return;
+    try {
+      await requestJson(`/api/events/${eventId}/bulk-check-in`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationIds: Array.from(selected) }),
+      });
+      setSelected(new Set());
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to check in selected attendees."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setSelected(new Set());
-    router.refresh();
   }
 
   if (registrations.length === 0) {
@@ -88,7 +87,7 @@ export function AttendeeList({ eventId, registrations, canManageBilling }: Atten
         {registrations.map((registration) => (
           <li className="attendee" key={registration.id}>
             <div className="inline-line">
-              {registration.status === "confirmed" ? (
+              {!readOnly && registration.status === "confirmed" ? (
                 <input
                   checked={selected.has(registration.id)}
                   onChange={() => toggle(registration.id)}
@@ -117,18 +116,18 @@ export function AttendeeList({ eventId, registrations, canManageBilling }: Atten
               {registration.paymentStatus === "refunded" ? (
                 <span className="badge warning">refunded</span>
               ) : null}
-              {registration.status === "pending_payment" ? (
+              {!readOnly && registration.status === "pending_payment" ? (
                 <MarkPaidButton eventId={eventId} registrationId={registration.id} />
               ) : null}
-              {canManageBilling && registration.paymentStatus === "paid" ? (
+              {!readOnly && canManageBilling && registration.paymentStatus === "paid" ? (
                 <RefundButton eventId={eventId} registrationId={registration.id} />
               ) : null}
-              {registration.status === "confirmed" ? (
+              {!readOnly && registration.status === "confirmed" ? (
                 <CheckInButton eventId={eventId} registrationId={registration.id} />
               ) : null}
-              {registration.status === "confirmed" ||
+              {!readOnly && (registration.status === "confirmed" ||
               registration.status === "waitlisted" ||
-              registration.status === "pending_payment" ? (
+              registration.status === "pending_payment") ? (
                 <CancelButton
                   eventId={eventId}
                   registrationId={registration.id}

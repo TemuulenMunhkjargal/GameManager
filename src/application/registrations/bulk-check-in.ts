@@ -1,12 +1,9 @@
-import type { Membership } from "../../domain/organizations/membership";
 import type { EventId } from "../../domain/events/event";
 import type { RegistrationId } from "../../domain/registrations/registration";
 import { failure, success, type Result } from "../../domain/shared/result";
-import { requireEventManagement } from "../shared/authorization";
 import type { RegistrationRepository } from "./ports";
 
 export type BulkCheckInCommand = {
-  actorMembership: Membership | null;
   eventId: EventId;
   registrationIds: RegistrationId[];
 };
@@ -20,12 +17,6 @@ export class BulkCheckInUseCase {
   public constructor(private readonly registrations: RegistrationRepository) {}
 
   public async execute(command: BulkCheckInCommand): Promise<Result<BulkCheckInOutcome>> {
-    const authorization = requireEventManagement(command.actorMembership);
-
-    if (!authorization.ok) {
-      return authorization;
-    }
-
     const outcome: BulkCheckInOutcome = { checkedIn: [], failed: [] };
 
     // Sequential, not Promise.all — these are writes against the same event

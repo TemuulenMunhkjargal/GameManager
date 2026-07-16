@@ -4,7 +4,7 @@ import type { OrganizationId } from "../../domain/organizations/organization";
 export interface EventRepository {
   findByIdForOrganization(eventId: EventId, organizationId: OrganizationId): Promise<Event | null>;
   save(event: Event): Promise<void>;
-  delete(eventId: EventId, organizationId: OrganizationId): Promise<boolean>;
+  deleteMany(eventIds: EventId[], organizationId: OrganizationId): Promise<number>;
 }
 
 /**
@@ -28,6 +28,7 @@ export type EventSummaryDTO = {
   status: EventStatus;
   visibility: EventVisibility;
   waitlistEnabled: boolean;
+  archivedAt: string | null;
 };
 
 export type EventDetailDTO = EventSummaryDTO & {

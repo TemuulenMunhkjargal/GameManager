@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
 const schema = z.object({
   displayName: z.string().min(1, "Name is required."),
@@ -10,12 +10,6 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
-
-  if (!actor) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  }
-
   const body = await req.json();
   const parsed = schema.safeParse(body);
 
@@ -28,7 +22,6 @@ export async function POST(req: Request) {
 
   const result = await container.useCases.createMemberProfile.execute({
     organizationId: DEFAULT_ORGANIZATION_ID,
-    actorMembership: actor.membership,
     displayName: parsed.data.displayName,
     email: parsed.data.email ?? null,
     phone: parsed.data.phone ?? null,
@@ -36,7 +29,7 @@ export async function POST(req: Request) {
   });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 403 });
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   return NextResponse.json(

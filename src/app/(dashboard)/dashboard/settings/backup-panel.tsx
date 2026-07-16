@@ -2,6 +2,7 @@
 
 import { DatabaseBackup, Download, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type Backup = { fileName: string; createdAt: string; size: number; kind: "auto" | "manual" | "pre-restore" | "pre-migration" };
 const PAGE_SIZE = 10;
@@ -14,20 +15,44 @@ export function BackupPanel() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  async function refresh() { const response = await fetch("/api/backups", { cache: "no-store" }); if (response.ok) { const next = ((await response.json()) as { backups: Backup[] }).backups; setBackups(next); setPage((current) => Math.min(current, Math.max(1, Math.ceil(next.length / PAGE_SIZE)))); } }
-  useEffect(() => { void fetch("/api/backups", { cache: "no-store" }).then((response) => response.json()).then((body: { backups: Backup[] }) => setBackups(body.backups)); }, []);
+  async function refresh() {
+    const body = await requestJson<{ backups: Backup[] }>("/api/backups", { cache: "no-store" });
+    setBackups(body.backups);
+    setPage((current) => Math.min(current, Math.max(1, Math.ceil(body.backups.length / PAGE_SIZE))));
+  }
+  useEffect(() => {
+    let active = true;
+    void requestJson<{ backups: Backup[] }>("/api/backups", { cache: "no-store" })
+      .then((body) => { if (active) setBackups(body.backups); })
+      .catch((cause) => { if (active) setError(messageFromRequestError(cause, "Unable to load backups.")); });
+    return () => { active = false; };
+  }, []);
   async function restore(url: string, options?: RequestInit) {
     if (!window.confirm("Restore this backup? GameHall will first preserve the current database.")) return;
-    setBusy(true); setError(null); setMessage(null); const response = await fetch(url, { method: "POST", ...options }); setBusy(false);
-    const body = await response.json().catch(() => ({})) as { error?: string };
-    if (!response.ok) { setError(body.error ?? "Restore failed."); return; }
-    setMessage("Backup restored successfully. Reloading GameHall..."); window.setTimeout(() => window.location.reload(), 700);
+    setBusy(true); setError(null); setMessage(null);
+    try {
+      await requestJson(url, { method: "POST", ...options });
+      setMessage("Backup restored successfully. Reloading GameHall...");
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch (cause) {
+      setError(messageFromRequestError(cause, "Restore failed."));
+    } finally {
+      setBusy(false);
+    }
   }
   async function upload(file?: File) { if (!file) return; const form = new FormData(); form.set("backup", file); await restore("/api/backups/restore", { body: form }); }
   async function remove(all = false) {
     if (!window.confirm(all ? `Permanently delete all ${backups.length} backups?` : `Permanently delete ${selected.length} selected backup(s)?`)) return;
-    setBusy(true); setError(null); const response = await fetch("/api/backups", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(all ? { all: true } : { fileNames: selected }) }); setBusy(false);
-    if (!response.ok) { setError("Unable to delete backups."); return; } setSelected([]); await refresh();
+    setBusy(true); setError(null);
+    try {
+      await requestJson("/api/backups", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(all ? { all: true } : { fileNames: selected }) });
+      setSelected([]);
+      await refresh();
+    } catch (cause) {
+      setError(messageFromRequestError(cause, "Unable to delete backups."));
+    } finally {
+      setBusy(false);
+    }
   }
   const pages = Math.max(1, Math.ceil(backups.length / PAGE_SIZE));
   const shown = backups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);

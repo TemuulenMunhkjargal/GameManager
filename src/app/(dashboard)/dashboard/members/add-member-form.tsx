@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 export function AddMemberForm() {
   const router = useRouter();
@@ -19,31 +20,28 @@ export function AddMemberForm() {
     setError(null);
     setIsSubmitting(true);
 
-    const response = await fetch("/api/members", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName,
-        email: email || null,
-        phone: phone || null,
-        favoriteGameSystem: favoriteGameSystem || "Unspecified",
-      }),
-    });
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const data = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(data?.error ?? "Unable to add member.");
-      return;
+    try {
+      await requestJson("/api/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName,
+          email: email || null,
+          phone: phone || null,
+          favoriteGameSystem: favoriteGameSystem || "Unspecified",
+        }),
+      });
+      setDisplayName("");
+      setEmail("");
+      setPhone("");
+      setFavoriteGameSystem("");
+      setIsOpen(false);
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to add member."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setDisplayName("");
-    setEmail("");
-    setPhone("");
-    setFavoriteGameSystem("");
-    setIsOpen(false);
-    router.refresh();
   }
 
   if (!isOpen) {

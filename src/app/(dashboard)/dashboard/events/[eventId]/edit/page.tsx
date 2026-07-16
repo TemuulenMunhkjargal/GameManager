@@ -2,8 +2,9 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { EditEventForm } from "../edit-event-form";
+import { isEventArchived } from "@/application/events/event-archive";
 
 type EditEventPageProps = {
   params: Promise<{ eventId: string }>;
@@ -12,22 +13,13 @@ type EditEventPageProps = {
 export default async function EditEventPage({ params }: EditEventPageProps) {
   const { eventId } = await params;
 
-  const [event, actor] = await Promise.all([
-    container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID),
-    resolveActor(DEFAULT_ORGANIZATION_ID),
-  ]);
+  const event = await container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID);
 
   if (!event) {
     notFound();
   }
 
-  const canManage = actor?.membership?.canManageEvents() ?? false;
-
-  if (!canManage) {
-    redirect(`/dashboard/events/${eventId}`);
-  }
-
-  if (event.status === "cancelled" || event.status === "completed") {
+  if (isEventArchived(event) || event.status === "cancelled" || event.status === "completed") {
     redirect(`/dashboard/events/${eventId}`);
   }
 

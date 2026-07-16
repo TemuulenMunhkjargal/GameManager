@@ -11,7 +11,8 @@ export async function POST(request: Request) {
   url.searchParams.set("wait", "true");
   try {
     const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "GameHall", content: "GameHall is connected. New published events can now be announced in this channel.", allowed_mentions: { parse: [] } }) });
+      body: JSON.stringify({ username: "GameHall", content: "GameHall is connected. Event and league updates can now be announced in this channel.", allowed_mentions: { parse: [] } }),
+      signal: AbortSignal.timeout(10_000) });
     if (!response.ok) return NextResponse.json({ error: `Discord rejected the webhook (${response.status}). Check that it still exists.` }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch {

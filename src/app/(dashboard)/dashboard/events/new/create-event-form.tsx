@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { commonGames, resolveGameChoice } from "@/lib/game-catalog";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 function toLocalInputValue(date: Date): string {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
@@ -20,19 +21,23 @@ export function CreateEventForm({ systems }: { systems: { id: string; name: stri
   const [customGame, setCustomGame] = useState("");
   async function onSubmit(formData: FormData) {
     setIsSubmitting(true); setError(null);
-    const entryFeeDollars = Number(formData.get("entryFeeDollars") || 0);
-    const game = resolveGameChoice(gameChoice, customGame, systems);
-    const payload = { title: String(formData.get("title") || ""), description: String(formData.get("description") || ""),
-      gameSystem: game.label, gameSystemId: game.gameSystemId,
-      startsAt: new Date(String(formData.get("startsAt"))).toISOString(),
-      endsAt: new Date(String(formData.get("endsAt"))).toISOString(), capacity: Number(formData.get("capacity") || 0),
-      entryFeeInCents: Math.round(entryFeeDollars * 100), waitlistEnabled: formData.get("waitlistEnabled") === "on",
-      publishImmediately: formData.get("publishImmediately") !== "draft" };
-    const response = await fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const result = await response.json() as { event?: { id: string }; error?: string };
-    setIsSubmitting(false);
-    if (!response.ok || !result.event) { setError(result.error ?? "Unable to create event."); return; }
-    router.push(`/dashboard/events/${result.event.id}`); router.refresh();
+    try {
+      const entryFeeDollars = Number(formData.get("entryFeeDollars") || 0);
+      const game = resolveGameChoice(gameChoice, customGame, systems);
+      const payload = { title: String(formData.get("title") || ""), description: String(formData.get("description") || ""),
+        gameSystem: game.label, gameSystemId: game.gameSystemId,
+        startsAt: new Date(String(formData.get("startsAt"))).toISOString(),
+        endsAt: new Date(String(formData.get("endsAt"))).toISOString(), capacity: Number(formData.get("capacity") || 0),
+        entryFeeInCents: Math.round(entryFeeDollars * 100), waitlistEnabled: formData.get("waitlistEnabled") === "on",
+        publishImmediately: formData.get("publishImmediately") !== "draft" };
+      const result = await requestJson<{ event?: { id: string } }>("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!result.event) throw new Error("GameHall did not return the created event.");
+      router.push(`/dashboard/events/${result.event.id}`); router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to create event."));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
   return <form action={onSubmit}><div className="form-grid">
     <div className="field full"><label htmlFor="title">Event title</label><input id="title" name="title" placeholder="Friday Night Draft" required /></div>

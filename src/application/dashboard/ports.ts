@@ -2,12 +2,9 @@ import type { EventSummaryDTO } from "../events/ports";
 import type { OrganizationId } from "../../domain/organizations/organization";
 
 export type DashboardSummaryDTO = {
-  upcomingEvents: number;
-  activeMembers: number;
-  confirmedSeats: number;
-  checkedInSeats: number;
+  upcomingEvents: EventSummaryDTO[];
+  activeMemberCount: number;
   revenueInCents: number;
-  nextEvent: EventSummaryDTO | null;
 };
 
 export interface DashboardQueries {

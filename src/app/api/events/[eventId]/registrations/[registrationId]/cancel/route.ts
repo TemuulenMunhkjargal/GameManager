@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
 type RouteContext = {
   params: Promise<{
@@ -11,15 +11,8 @@ type RouteContext = {
 export async function POST(_request: Request, context: RouteContext) {
   const { eventId, registrationId } = await context.params;
 
-  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
-
-  if (!actor) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  }
-
   const cancelResult = await container.useCases.cancelRegistration.execute({
     organizationId: DEFAULT_ORGANIZATION_ID,
-    actorMembership: actor.membership,
     eventId,
     registrationId,
   });
@@ -35,9 +28,7 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   // Not every "Cancel" click is a confirmed registration — it might be a
-  // waitlist entry, which lives in a separate table/use case and (for now)
-  // doesn't require staff authorization, since withdrawing yourself from a
-  // queue is lower-stakes than cancelling someone else's confirmed seat.
+  // waitlist entry, which lives in a separate table/use case.
   const withdrawResult = await container.useCases.withdrawFromWaitlist.execute({
     eventId,
     waitlistEntryId: registrationId,

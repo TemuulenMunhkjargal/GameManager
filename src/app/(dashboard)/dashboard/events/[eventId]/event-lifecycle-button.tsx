@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type EventLifecycleButtonProps = {
   eventId: string;
@@ -18,17 +19,14 @@ export function EventLifecycleButton({ eventId, action }: EventLifecycleButtonPr
     setIsSubmitting(true);
     setError(null);
 
-    const response = await fetch(`/api/events/${eventId}/${action}`, { method: "POST" });
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Action failed.");
-      return;
+    try {
+      await requestJson(`/api/events/${eventId}/${action}`, { method: "POST" });
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Action failed."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    router.refresh();
   }
 
   return (

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 
 type RouteContext = {
   params: Promise<{
@@ -36,12 +36,6 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PUT(request: Request, context: RouteContext) {
   const { eventId } = await context.params;
 
-  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
-
-  if (!actor) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  }
-
   const body = await request.json();
   const parsed = updateEventSchema.safeParse(body);
 
@@ -54,7 +48,6 @@ export async function PUT(request: Request, context: RouteContext) {
 
   const result = await container.useCases.updateEvent.execute({
     organizationId: DEFAULT_ORGANIZATION_ID,
-    actorMembership: actor.membership,
     eventId,
     title: parsed.data.title,
     description: parsed.data.description,
@@ -68,7 +61,7 @@ export async function PUT(request: Request, context: RouteContext) {
   });
 
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: 403 });
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
   const event = await container.events.getDetail(result.value.id, DEFAULT_ORGANIZATION_ID);
@@ -78,10 +71,16 @@ export async function PUT(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   const { eventId } = await context.params;
-  const event = await container.events.findByIdForOrganization(eventId, DEFAULT_ORGANIZATION_ID);
-  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
-  if (event.status !== "draft" && event.status !== "cancelled") return NextResponse.json({ error: "Cancel this event before deleting it." }, { status: 409 });
-  await container.events.delete(eventId, DEFAULT_ORGANIZATION_ID);
-  return NextResponse.json({ ok: true });
+  const result = await container.useCases.archiveEvent.execute({
+    organizationId: DEFAULT_ORGANIZATION_ID,
+    eventId,
+  });
+
+  if (!result.ok) {
+    const status = result.error === "Event not found." ? 404 : result.error === "Event is already archived." ? 409 : 400;
+    return NextResponse.json({ error: result.error }, { status });
+  }
+
+  return NextResponse.json({ ok: true, archived: true });
 }
 

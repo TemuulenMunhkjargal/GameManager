@@ -6,8 +6,8 @@ import { initializeDatabase } from "../../src/infrastructure/db/initialize";
 import { DrizzleTableRepository } from "../../src/infrastructure/db/repositories/table-repository";
 
 describe("DrizzleTableRepository", () => {
-  let sqlite: Sqlite.Database; let repository: DrizzleTableRepository;
-  beforeEach(() => { sqlite = new Sqlite(":memory:"); sqlite.pragma("foreign_keys = ON"); initializeDatabase(sqlite); repository = new DrizzleTableRepository(drizzle(sqlite, { schema })); });
+  let sqlite: Sqlite.Database; let repository: DrizzleTableRepository; let queries: string[];
+  beforeEach(() => { queries = []; sqlite = new Sqlite(":memory:", { verbose: (query) => queries.push(String(query)) }); sqlite.pragma("foreign_keys = ON"); initializeDatabase(sqlite); repository = new DrizzleTableRepository(drizzle(sqlite, { schema })); });
   afterEach(() => sqlite.close());
 
   it("tracks seating, moving, and release sessions", async () => {
@@ -37,5 +37,16 @@ describe("DrizzleTableRepository", () => {
     await repository.create("org_mana_vault", "Alpha", 4); const table = (await repository.listForOrganization("org_mana_vault"))[0];
     await repository.delete("org_mana_vault", table.id);
     expect(await repository.listForOrganization("org_mana_vault")).toHaveLength(0);
+  });
+
+  it("loads every table and occupant with a bounded query count", async () => {
+    for (let index = 1; index <= 8; index += 1) await repository.create("org_mana_vault", `Table ${index}`, 4);
+    const tables = await repository.listForOrganization("org_mana_vault");
+    for (const table of tables) await repository.seat({ organizationId: "org_mana_vault", tableId: table.id, guestName: "Guest 1" });
+    queries = [];
+    const loaded = await repository.listForOrganization("org_mana_vault");
+    expect(loaded).toHaveLength(8);
+    expect(loaded.every((table) => table.occupants.length === 1)).toBe(true);
+    expect(queries.filter((query) => /^select\b/i.test(query.trim()))).toHaveLength(3);
   });
 });

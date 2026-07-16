@@ -21,15 +21,10 @@ export class DrizzleOrganizationRepository implements OrganizationRepository {
     return new Organization(
       row.id,
       row.name,
-      row.publicSlug,
-      row.type,
       row.timezone,
       row.contactEmail,
-      row.defaultVenueName,
-      row.publicPageEnabled,
       row.waitlistsEnabledByDefault,
       row.discordWebhookUrl,
-      row.status,
     );
   }
 
@@ -37,15 +32,15 @@ export class DrizzleOrganizationRepository implements OrganizationRepository {
     const values = {
       id: organization.id,
       name: organization.name,
-      publicSlug: organization.slug,
-      type: organization.type,
+      publicSlug: "local-workspace",
+      type: "community_group" as const,
       timezone: organization.timezone,
       contactEmail: organization.contactEmail,
-      defaultVenueName: organization.defaultVenueName,
-      publicPageEnabled: organization.publicPageEnabled,
+      defaultVenueName: "",
+      publicPageEnabled: false,
       waitlistsEnabledByDefault: organization.waitlistsEnabledByDefault,
       discordWebhookUrl: organization.discordWebhookUrl,
-      status: organization.status,
+      status: "active" as const,
     };
 
     await this.db

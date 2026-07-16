@@ -1,6 +1,11 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // GameHall only serves bundled local artwork. Avoid the runtime image optimizer,
+  // whose server-side asset request cannot carry Electron's private session cookie.
+  images: {
+    unoptimized: true,
+  },
   outputFileTracingExcludes: {
     "/*": [
       ".git/**/*",
@@ -41,11 +46,13 @@ const nextConfig = {
               "connect-src 'self'",
               "object-src 'none'",
               "frame-src 'none'",
+              "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
             ].join("; "),
           },
           { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "no-referrer" },
         ],
       },

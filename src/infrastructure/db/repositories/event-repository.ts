@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Event, type EventId } from "../../../domain/events/event";
 import { Money } from "../../../domain/shared/money";
 import type { OrganizationId } from "../../../domain/organizations/organization";
@@ -17,25 +17,32 @@ type EventRow = typeof EventsTable.$inferSelect;
 export class DrizzleEventRepository implements EventRepository, EventQueries {
   public constructor(private readonly db: Database) {}
 
-  private async confirmedCount(eventId: EventId): Promise<number> {
+  private async reservedCounts(eventIds: EventId[]): Promise<Map<EventId, number>> {
+    if (eventIds.length === 0) return new Map();
     const rows = await this.db
-      .select({ id: registrations.id })
+      .select({ eventId: registrations.eventId, count: sql<number>`count(*)` })
       .from(registrations)
-      .where(and(eq(registrations.eventId, eventId), inArray(registrations.status, ["confirmed", "checked_in"])));
+      .where(and(
+        inArray(registrations.eventId, eventIds),
+        inArray(registrations.status, ["pending_payment", "confirmed", "checked_in"]),
+      ))
+      .groupBy(registrations.eventId);
 
-    return rows.length;
+    return new Map(rows.map((row) => [row.eventId, Number(row.count)]));
   }
 
-  private async waitlistCount(eventId: EventId): Promise<number> {
+  private async waitlistCounts(eventIds: EventId[]): Promise<Map<EventId, number>> {
+    if (eventIds.length === 0) return new Map();
     const rows = await this.db
-      .select({ id: waitlistEntries.id })
+      .select({ eventId: waitlistEntries.eventId, count: sql<number>`count(*)` })
       .from(waitlistEntries)
-      .where(and(eq(waitlistEntries.eventId, eventId), eq(waitlistEntries.status, "waiting")));
+      .where(and(inArray(waitlistEntries.eventId, eventIds), eq(waitlistEntries.status, "waiting")))
+      .groupBy(waitlistEntries.eventId);
 
-    return rows.length;
+    return new Map(rows.map((row) => [row.eventId, Number(row.count)]));
   }
 
-  private async toDomain(row: EventRow): Promise<Event> {
+  private toDomain(row: EventRow, reservedCount: number): Event {
     return new Event(
       row.id,
       row.organizationId,
@@ -46,7 +53,7 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       row.startsAt,
       row.endsAt,
       row.capacity,
-      await this.confirmedCount(row.id),
+      reservedCount,
       row.waitlistEnabled,
       row.entryFeeInCents > 0 ? Money.usd(row.entryFeeInCents) : null,
       row.gameSystemId,
@@ -55,10 +62,11 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       row.venueName,
       row.roomId,
       row.roomName,
+      row.archivedAt,
     );
   }
 
-  private async toSummaryDTO(row: EventRow): Promise<EventSummaryDTO> {
+  private toSummaryDTO(row: EventRow, reservedCount: number, waitlistCount: number): EventSummaryDTO {
     return {
       id: row.id,
       title: row.title,
@@ -68,12 +76,13 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       startsAt: row.startsAt.toISOString(),
       endsAt: row.endsAt.toISOString(),
       capacity: row.capacity,
-      confirmedCount: await this.confirmedCount(row.id),
-      waitlistCount: await this.waitlistCount(row.id),
+      confirmedCount: reservedCount,
+      waitlistCount,
       entryFeeInCents: row.entryFeeInCents,
       status: row.status,
       visibility: row.visibility,
       waitlistEnabled: row.waitlistEnabled,
+      archivedAt: row.archivedAt?.toISOString() ?? null,
     };
   }
 
@@ -87,7 +96,9 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       .where(and(eq(events.id, eventId), eq(events.organizationId, organizationId)))
       .limit(1);
 
-    return row ? this.toDomain(row) : null;
+    if (!row) return null;
+    const reserved = await this.reservedCounts([row.id]);
+    return this.toDomain(row, reserved.get(row.id) ?? 0);
   }
 
   public async save(event: Event): Promise<void> {
@@ -109,6 +120,7 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       venueName: event.venueName,
       roomId: event.roomId,
       roomName: event.roomName,
+      archivedAt: event.archivedAt,
     };
 
     await this.db
@@ -117,16 +129,38 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       .onConflictDoUpdate({ target: events.id, set: values });
   }
 
-  public async delete(eventId: EventId, organizationId: OrganizationId): Promise<boolean> {
-    const removed = await this.db.delete(events).where(and(eq(events.id, eventId), eq(events.organizationId, organizationId))).returning({ id: events.id });
-    return removed.length > 0;
+  public async deleteMany(eventIds: EventId[], organizationId: OrganizationId): Promise<number> {
+    if (eventIds.length === 0) return 0;
+    const uniqueIds = [...new Set(eventIds)];
+
+    return this.db.transaction((transaction) => {
+      let removed = 0;
+      for (let offset = 0; offset < uniqueIds.length; offset += 500) {
+        removed += transaction
+          .delete(events)
+          .where(and(eq(events.organizationId, organizationId), inArray(events.id, uniqueIds.slice(offset, offset + 500))))
+          .returning({ id: events.id })
+          .all()
+          .length;
+      }
+      return removed;
+    });
   }
 
   public async listForOrganization(organizationId: OrganizationId): Promise<EventSummaryDTO[]> {
-    const rows = await this.db.select().from(events).where(eq(events.organizationId, organizationId));
-    const sorted = [...rows].sort((first, second) => first.startsAt.getTime() - second.startsAt.getTime());
-
-    return Promise.all(sorted.map((row) => this.toSummaryDTO(row)));
+    const rows = await this.db.select().from(events)
+      .where(eq(events.organizationId, organizationId))
+      .orderBy(asc(events.startsAt));
+    const eventIds = rows.map((row) => row.id);
+    const [reserved, waitlisted] = await Promise.all([
+      this.reservedCounts(eventIds),
+      this.waitlistCounts(eventIds),
+    ]);
+    return rows.map((row) => this.toSummaryDTO(
+      row,
+      reserved.get(row.id) ?? 0,
+      waitlisted.get(row.id) ?? 0,
+    ));
   }
 
   public async getDetail(
@@ -143,8 +177,12 @@ export class DrizzleEventRepository implements EventRepository, EventQueries {
       return null;
     }
 
+    const [reserved, waitlisted] = await Promise.all([
+      this.reservedCounts([row.id]),
+      this.waitlistCounts([row.id]),
+    ]);
     return {
-      ...(await this.toSummaryDTO(row)),
+      ...this.toSummaryDTO(row, reserved.get(row.id) ?? 0, waitlisted.get(row.id) ?? 0),
       organizationId: row.organizationId,
       description: row.description,
       venueId: row.venueId,

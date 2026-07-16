@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestamp = (name: string) => integer(name, { mode: "timestamp" });
 const boolean = (name: string) => integer(name, { mode: "boolean" });
@@ -109,6 +109,7 @@ export const events = sqliteTable("events", {
   venueName: text("venue_name").notNull().default(""),
   roomId: text("room_id"),
   roomName: text("room_name"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().default(now),
 });
 
@@ -194,10 +195,12 @@ export const leagues = sqliteTable("leagues", {
     .default("draft"),
   startsAt: timestamp("starts_at"),
   endsAt: timestamp("ends_at"),
+  configuredRounds: integer("configured_rounds").notNull().default(0),
+  topCutSize: integer("top_cut_size").notNull().default(4),
   createdAt: timestamp("created_at").notNull().default(now),
 });
 
-export const leagueStandings = sqliteTable("league_standings", {
+export const leagueParticipants = sqliteTable("league_participants", {
   id: text("id").primaryKey(),
   leagueId: text("league_id")
     .notNull()
@@ -205,8 +208,66 @@ export const leagueStandings = sqliteTable("league_standings", {
   memberProfileId: text("member_profile_id")
     .notNull()
     .references(() => memberProfiles.id, { onDelete: "cascade" }),
+  seed: integer("seed").notNull(),
+  status: text("status", { enum: ["active", "withdrawn"] }).notNull().default("active"),
+  enrolledAt: timestamp("enrolled_at").notNull().default(now),
+}, (table) => [
+  uniqueIndex("league_participants_league_member_uq").on(table.leagueId, table.memberProfileId),
+  index("league_participants_league_idx").on(table.leagueId, table.seed),
+]);
+
+export const leagueRounds = sqliteTable("league_rounds", {
+  id: text("id").primaryKey(),
+  leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+  number: integer("number").notNull(),
+  stage: text("stage", { enum: ["regular", "swiss", "top_cut", "upper", "lower", "final", "pod", "series", "campaign", "open"] }).notNull(),
+  status: text("status", { enum: ["pending", "active", "completed"] }).notNull().default("pending"),
+  label: text("label").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().default(now),
+}, (table) => [
+  uniqueIndex("league_rounds_league_number_uq").on(table.leagueId, table.number),
+  index("league_rounds_league_idx").on(table.leagueId, table.number),
+]);
+
+export const leagueMatches = sqliteTable("league_matches", {
+  id: text("id").primaryKey(),
+  leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+  roundId: text("round_id").references(() => leagueRounds.id, { onDelete: "cascade" }),
+  sequence: integer("sequence").notNull(),
+  stage: text("stage", { enum: ["regular", "swiss", "top_cut", "upper", "lower", "final", "pod", "series", "campaign", "open"] }).notNull(),
+  status: text("status", { enum: ["scheduled", "completed", "void"] }).notNull().default("scheduled"),
+  label: text("label").notNull().default(""),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().default(now),
+}, (table) => [
+  index("league_matches_league_idx").on(table.leagueId, table.createdAt),
+  index("league_matches_round_idx").on(table.roundId, table.sequence),
+]);
+
+export const leagueMatchEntries = sqliteTable("league_match_entries", {
+  id: text("id").primaryKey(),
+  matchId: text("match_id").notNull().references(() => leagueMatches.id, { onDelete: "cascade" }),
+  participantId: text("participant_id").notNull().references(() => leagueParticipants.id, { onDelete: "cascade" }),
+  score: integer("score"),
+  placement: integer("placement"),
+  outcome: text("outcome", { enum: ["win", "loss", "draw", "bye", "placed", "participated"] }),
+}, (table) => [
+  uniqueIndex("league_match_entries_match_participant_uq").on(table.matchId, table.participantId),
+  index("league_match_entries_participant_idx").on(table.participantId),
+]);
+
+export const leagueStatAdjustments = sqliteTable("league_stat_adjustments", {
+  id: text("id").primaryKey(),
+  leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+  participantId: text("participant_id").notNull().references(() => leagueParticipants.id, { onDelete: "cascade" }),
   wins: integer("wins").notNull().default(0),
   losses: integer("losses").notNull().default(0),
   draws: integer("draws").notNull().default(0),
-  bonusPoints: integer("bonus_points").notNull().default(0),
-});
+  points: integer("points").notNull().default(0),
+  reason: text("reason").notNull(),
+  createdAt: timestamp("created_at").notNull().default(now),
+}, (table) => [
+  index("league_stat_adjustments_league_idx").on(table.leagueId, table.createdAt),
+  index("league_stat_adjustments_participant_idx").on(table.participantId),
+]);

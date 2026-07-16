@@ -11,6 +11,8 @@ export interface DiscordGateway {
     eventDate: string;
     capacity: number;
     entryFeeInCents: number;
+    headline?: string;
+    description?: string;
   }): Promise<void>;
   sendLeagueAnnouncement(options: {
     webhookUrl: string;
