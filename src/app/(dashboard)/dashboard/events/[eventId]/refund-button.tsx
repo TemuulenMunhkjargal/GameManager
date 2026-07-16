@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Undo2 } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 type RefundButtonProps = {
   eventId: string;
@@ -19,20 +20,15 @@ export function RefundButton({ eventId, registrationId }: RefundButtonProps) {
     setIsSubmitting(true);
     setError(null);
 
-    const response = await fetch(`/api/events/${eventId}/registrations/${registrationId}/refund`, {
-      method: "POST",
-    });
-
-    setIsSubmitting(false);
-    setConfirming(false);
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Unable to process refund.");
-      return;
+    try {
+      await requestJson(`/api/events/${eventId}/registrations/${registrationId}/refund`, { method: "POST" });
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to process refund."));
+    } finally {
+      setIsSubmitting(false);
+      setConfirming(false);
     }
-
-    router.refresh();
   }
 
   if (confirming) {

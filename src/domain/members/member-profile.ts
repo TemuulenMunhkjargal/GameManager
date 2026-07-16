@@ -1,8 +1,8 @@
 import { Entity } from "../shared/entity";
-import type { UserId } from "../organizations/membership";
 import type { OrganizationId } from "../organizations/organization";
 
 export type MemberProfileId = string;
+export type UserId = string;
 export type MemberStatus = "active" | "blocked" | "archived";
 
 export class MemberProfile extends Entity<MemberProfileId> {

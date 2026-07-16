@@ -8,11 +8,8 @@ export interface OrganizationRepository {
 export type OrganizationSettingsDTO = {
   id: OrganizationId;
   name: string;
-  publicSlug: string;
   timezone: string;
   contactEmail: string;
-  defaultVenueName: string;
-  publicPageEnabled: boolean;
   waitlistsEnabledByDefault: boolean;
   discordWebhookUrl: string | null;
 };

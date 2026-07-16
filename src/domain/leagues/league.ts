@@ -31,6 +31,8 @@ export class League extends Entity<LeagueId> {
     public readonly status: LeagueStatus,
     public readonly startsAt: Date | null,
     public readonly endsAt: Date | null,
+    public readonly configuredRounds: number = 0,
+    public readonly topCutSize: number = 4,
   ) {
     super(id);
   }
@@ -67,6 +69,7 @@ export class League extends Entity<LeagueId> {
     return new League(
       this.id, this.organizationId, this.gameSystemId, this.gameSystemLabel,
       this.name, this.description, this.format, status, this.startsAt, this.endsAt,
+      this.configuredRounds, this.topCutSize,
     );
   }
 }

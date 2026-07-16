@@ -46,8 +46,13 @@ export class Event extends Entity<EventId> {
     public readonly venueName: string,
     public readonly roomId: RoomId | null,
     public readonly roomName: string | null,
+    public readonly archivedAt: Date | null = null,
   ) {
     super(id);
+
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      throw new Error("Event start and end times are required.");
+    }
 
     if (capacity < 0) {
       throw new Error("Event capacity cannot be negative.");
@@ -63,6 +68,10 @@ export class Event extends Entity<EventId> {
   }
 
   public canRegister(now = new Date()): Result<"confirmed" | "waitlisted"> {
+    if (this.archivedAt) {
+      return failure("Archived events cannot accept registrations.");
+    }
+
     if (this.status !== "published") {
       return failure("Event is not open for registration.");
     }
@@ -86,7 +95,15 @@ export class Event extends Entity<EventId> {
     return !!this.entryFee && !this.entryFee.isZero();
   }
 
-  public publish(): Result<Event> {
+  public isArchived(now = new Date()): boolean {
+    return this.archivedAt !== null || this.endsAt < now;
+  }
+
+  public publish(now = new Date()): Result<Event> {
+    if (this.isArchived(now)) {
+      return failure("Archived events cannot be published.");
+    }
+
     if (this.status === "published") {
       return failure("Event is already published.");
     }
@@ -98,7 +115,11 @@ export class Event extends Entity<EventId> {
     return success(this.withStatus("published"));
   }
 
-  public cancel(): Result<Event> {
+  public cancel(now = new Date()): Result<Event> {
+    if (this.isArchived(now)) {
+      return failure("Archived events cannot be cancelled.");
+    }
+
     if (this.status === "cancelled") {
       return failure("Event is already cancelled.");
     }
@@ -110,7 +131,11 @@ export class Event extends Entity<EventId> {
     return success(this.withStatus("cancelled"));
   }
 
-  public updateDetails(update: EventDetailsUpdate): Result<Event> {
+  public updateDetails(update: EventDetailsUpdate, now = new Date()): Result<Event> {
+    if (this.isArchived(now)) {
+      return failure("Archived events cannot be edited.");
+    }
+
     if (this.status === "cancelled") {
       return failure("Cancelled events cannot be edited.");
     }
@@ -129,6 +154,10 @@ export class Event extends Entity<EventId> {
       return failure(
         `Capacity can't be set below the ${this.confirmedRegistrationCount} confirmed registration(s) this event already has.`,
       );
+    }
+
+    if (Number.isNaN(update.startsAt.getTime()) || Number.isNaN(update.endsAt.getTime())) {
+      return failure("Event start and end times are required.");
     }
 
     if (update.endsAt <= update.startsAt) {
@@ -155,17 +184,30 @@ export class Event extends Entity<EventId> {
         update.venueName.trim() || "Store",
         update.roomId,
         update.roomName?.trim() || null,
+        this.archivedAt,
       ),
     );
   }
 
+  public archive(now = new Date()): Result<Event> {
+    if (this.archivedAt) {
+      return failure("Event is already archived.");
+    }
+
+    return success(this.copy({ archivedAt: now }));
+  }
+
   private withStatus(status: EventStatus): Event {
+    return this.copy({ status });
+  }
+
+  private copy(overrides: { status?: EventStatus; archivedAt?: Date | null }): Event {
     return new Event(
       this.id,
       this.organizationId,
       this.title,
       this.description,
-      status,
+      overrides.status ?? this.status,
       this.visibility,
       this.startsAt,
       this.endsAt,
@@ -179,6 +221,7 @@ export class Event extends Entity<EventId> {
       this.venueName,
       this.roomId,
       this.roomName,
+      overrides.archivedAt === undefined ? this.archivedAt : overrides.archivedAt,
     );
   }
 }

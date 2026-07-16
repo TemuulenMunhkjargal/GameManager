@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 const TYPES = ["tcg", "ttrpg", "miniatures", "board_game"] as const;
 
@@ -22,26 +23,23 @@ export function AddGameSystemForm() {
     setError(null);
     setIsSubmitting(true);
 
-    const response = await fetch("/api/game-systems", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, type: type === "custom" ? "other" : type,
-        defaultCapacity, notes: type === "custom" ? `Category: ${customType.trim()}\n${notes}`.trim() : notes }),
-    });
-
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Unable to add game system.");
-      return;
+    try {
+      await requestJson("/api/game-systems", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type: type === "custom" ? "other" : type,
+          defaultCapacity, notes: type === "custom" ? `Category: ${customType.trim()}\n${notes}`.trim() : notes }),
+      });
+      setName("");
+      setNotes("");
+      setDefaultCapacity(8);
+      setIsOpen(false);
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to add game system."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setName("");
-    setNotes("");
-    setDefaultCapacity(8);
-    setIsOpen(false);
-    router.refresh();
   }
 
   if (!isOpen) {

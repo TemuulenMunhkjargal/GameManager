@@ -17,6 +17,13 @@ export class DrizzleOrganizationSettingsQueries implements OrganizationSettingsQ
       .where(eq(organizations.id, organizationId))
       .limit(1);
 
-    return row ? { ...row } : null;
+    return row ? {
+      id: row.id,
+      name: row.name,
+      timezone: row.timezone,
+      contactEmail: row.contactEmail,
+      waitlistsEnabledByDefault: row.waitlistsEnabledByDefault,
+      discordWebhookUrl: row.discordWebhookUrl,
+    } : null;
   }
 }

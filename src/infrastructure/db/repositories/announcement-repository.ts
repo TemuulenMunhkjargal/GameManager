@@ -28,6 +28,7 @@ function toDomain(row: AnnouncementRow): Announcement {
     row.sentAt,
     row.recipientCount,
     row.scheduledFor,
+    row.notifyDiscord,
   );
 }
 
@@ -60,6 +61,7 @@ export class DrizzleAnnouncementRepository implements AnnouncementRepository, An
       recipientCount: announcement.recipientCount,
       sentAt: announcement.sentAt,
       scheduledFor: announcement.scheduledFor,
+      notifyDiscord: announcement.notifyDiscord,
     };
 
     await this.db

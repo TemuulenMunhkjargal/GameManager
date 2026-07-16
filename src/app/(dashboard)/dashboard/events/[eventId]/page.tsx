@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Download } from "lucide-react";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { AttendeeList } from "./attendee-list";
 import { EventLifecycleButton } from "./event-lifecycle-button";
 import { AnnouncementForm } from "./announcement-form";
 import { AddAttendeeForm } from "./add-attendee-form";
 import { DeleteEventButton } from "./delete-event-button";
+import { isEventArchived } from "@/application/events/event-archive";
 
 type EventDetailPageProps = {
   params: Promise<{ eventId: string }>;
@@ -16,10 +17,9 @@ type EventDetailPageProps = {
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
   const { eventId } = await params;
 
-  const [event, registrations, actor, settings, announcementList, members] = await Promise.all([
+  const [event, registrations, settings, announcementList, members] = await Promise.all([
     container.events.getDetail(eventId, DEFAULT_ORGANIZATION_ID),
     container.registrations.listForEvent(eventId),
-    resolveActor(DEFAULT_ORGANIZATION_ID),
     container.settings.get(DEFAULT_ORGANIZATION_ID),
     container.announcements.listForEvent(eventId, DEFAULT_ORGANIZATION_ID),
     container.members.listForOrganization(DEFAULT_ORGANIZATION_ID),
@@ -29,9 +29,9 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     notFound();
   }
 
-  const canManage = actor?.membership?.canManageEvents() ?? false;
-  const canManageBilling = actor?.membership?.canManageBilling() ?? false;
   const hasDiscordWebhook = !!settings?.discordWebhookUrl;
+  const archived = isEventArchived(event);
+  const canManageActiveEvent = !archived;
 
   return (
     <>
@@ -44,26 +44,28 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           </p>
         </div>
         <div className="form-actions">
-          <Link className="button secondary" href="/dashboard/events">
+          <Link className="button secondary" href={archived ? "/dashboard/events/archive" : "/dashboard/events"}>
             Back
           </Link>
-          {canManage && event.status !== "cancelled" && event.status !== "completed" ? (
+          {canManageActiveEvent && event.status !== "cancelled" && event.status !== "completed" ? (
             <Link className="button secondary" href={`/dashboard/events/${event.id}/edit`}>
               <Pencil aria-hidden="true" size={16} />
               Edit
             </Link>
           ) : null}
-          {canManage && event.status === "draft" ? (
+          {canManageActiveEvent && event.status === "draft" ? (
             <EventLifecycleButton action="publish" eventId={event.id} />
           ) : null}
-          {canManage && event.status === "published" ? (
+          {canManageActiveEvent && event.status === "published" ? (
             <EventLifecycleButton action="cancel" eventId={event.id} />
           ) : null}
-          {canManage && (event.status === "draft" || event.status === "cancelled") ? <DeleteEventButton eventId={event.id} name={event.title} /> : null}
+          {canManageActiveEvent ? <DeleteEventButton eventId={event.id} name={event.title} /> : null}
         </div>
       </div>
 
-      {event.status === "cancelled" ? (
+      {archived ? (
+        <p className="notice">This event is archived. Its history is read-only unless you permanently delete it from Archived Events.</p>
+      ) : event.status === "cancelled" ? (
         <p className="notice error">This event has been cancelled. Registrations are closed.</p>
       ) : event.status === "draft" ? (
         <p className="notice">
@@ -84,20 +86,20 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </a>
               ) : null}
             </div>
-            {canManage && event.status === "published" ? <div style={{ marginBottom: 14 }}><AddAttendeeForm eventId={event.id} players={members.filter((member) => member.status === "active" && !registrations.some((registration) => registration.memberProfileId === member.id)).map((member) => ({ id: member.id, displayName: member.displayName }))} /></div> : null}
+            {canManageActiveEvent && event.status === "published" ? <div style={{ marginBottom: 14 }}><AddAttendeeForm eventId={event.id} players={members.filter((member) => member.status === "active" && !registrations.some((registration) => registration.memberProfileId === member.id)).map((member) => ({ id: member.id, displayName: member.displayName }))} /></div> : null}
             <AttendeeList
-              canManageBilling={canManageBilling}
+              canManageBilling={!archived}
               eventId={event.id}
+              readOnly={archived}
               registrations={registrations}
             />
           </section>
 
-          {canManage && event.status === "published" && registrations.length > 0 ? (
+          {canManageActiveEvent && event.status === "published" ? (
             <section className="panel detail-panel">
               <h2>Send announcement</h2>
               <p className="muted" style={{ marginBottom: 16 }}>
-                Email all or a subset of attendees. Posts to Discord too if a webhook is
-                configured.
+                Post an update to the Discord channel configured in Settings.
               </p>
               <AnnouncementForm eventId={event.id} hasDiscordWebhook={hasDiscordWebhook} />
 
@@ -111,7 +113,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                         <div>
                           <strong>{ann.subject}</strong>
                           <div className="muted">
-                            {ann.audience.replace("_", " ")}
+                            Discord channel
                             {ann.status === "scheduled" && ann.scheduledFor
                               ? ` · sends ${formatDateTime(ann.scheduledFor, settings?.timezone)}`
                               : null}
@@ -129,9 +131,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                           >
                             {ann.status}
                           </span>
-                          {ann.status === "sent" ? (
-                            <span className="muted">{ann.recipientCount} sent</span>
-                          ) : null}
+                          {ann.status === "sent" ? <span className="muted">Posted to Discord</span> : null}
                         </div>
                       </li>
                     ))}
@@ -155,7 +155,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                     : "badge"
               }
             >
-              {event.status}
+              {archived ? "archived" : event.status}
             </span>
           </p>
           <p>

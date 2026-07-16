@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 export function AddAttendeeForm({ eventId, players }: { eventId: string; players: { id: string; displayName: string }[] }) {
   const router = useRouter();
@@ -11,10 +12,14 @@ export function AddAttendeeForm({ eventId, players }: { eventId: string; players
   const [error, setError] = useState<string | null>(null);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(null);
-    const response = await fetch(`/api/events/${eventId}/registrations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberProfileId: playerId }) });
-    const body = await response.json().catch(() => ({})) as { error?: string }; setBusy(false);
-    if (!response.ok) { setError(body.error ?? "Unable to add player."); return; }
-    router.refresh();
+    try {
+      await requestJson(`/api/events/${eventId}/registrations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ memberProfileId: playerId }) });
+      router.refresh();
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "Unable to add player."));
+    } finally {
+      setBusy(false);
+    }
   }
   if (!players.length) return <p className="muted">All active players are already on this event. Add more from Players.</p>;
   return <form className="inline-line" onSubmit={submit}>

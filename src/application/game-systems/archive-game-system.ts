@@ -1,8 +1,6 @@
 import type { GameSystem, GameSystemId } from "../../domain/game-systems/game-system";
-import type { Membership } from "../../domain/organizations/membership";
 import type { OrganizationId } from "../../domain/organizations/organization";
 import { failure, type Result } from "../../domain/shared/result";
-import { requireEventManagement } from "../shared/authorization";
 import type { GameSystemRepository } from "./ports";
 
 export class ArchiveGameSystemUseCase {
@@ -10,12 +8,8 @@ export class ArchiveGameSystemUseCase {
 
   public async execute(cmd: {
     organizationId: OrganizationId;
-    actorMembership: Membership | null;
     gameSystemId: GameSystemId;
   }): Promise<Result<GameSystem>> {
-    const auth = requireEventManagement(cmd.actorMembership);
-    if (!auth.ok) return auth;
-
     const gameSystem = await this.gameSystems.findById(cmd.gameSystemId, cmd.organizationId);
     if (!gameSystem) return failure("Game system not found.");
 
@@ -32,12 +26,8 @@ export class RestoreGameSystemUseCase {
 
   public async execute(cmd: {
     organizationId: OrganizationId;
-    actorMembership: Membership | null;
     gameSystemId: GameSystemId;
   }): Promise<Result<GameSystem>> {
-    const auth = requireEventManagement(cmd.actorMembership);
-    if (!auth.ok) return auth;
-
     const gameSystem = await this.gameSystems.findById(cmd.gameSystemId, cmd.organizationId);
     if (!gameSystem) return failure("Game system not found.");
 

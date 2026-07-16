@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
-import { splitArchivedEvents } from "@/lib/event-archive";
+import { splitArchivedEvents } from "@/application/events/event-archive";
 
 const schema = z.union([z.object({ all: z.literal(true) }), z.object({ eventIds: z.array(z.string()).min(1).max(100) })]);
 
@@ -12,6 +12,6 @@ export async function DELETE(request: Request) {
   const archived = splitArchivedEvents(events);
   const pastIds = new Set([...archived.retained, ...archived.expired].map((event) => event.id));
   const requested = "all" in parsed.data ? [...pastIds] : parsed.data.eventIds.filter((id) => pastIds.has(id));
-  await Promise.all(requested.map((id) => container.events.delete(id, DEFAULT_ORGANIZATION_ID)));
-  return NextResponse.json({ deleted: requested.length });
+  const deleted = await container.events.deleteMany(requested, DEFAULT_ORGANIZATION_ID);
+  return NextResponse.json({ deleted });
 }

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { GameSystem, type GameSystemId } from "../../../domain/game-systems/game-system";
 import type { OrganizationId } from "../../../domain/organizations/organization";
 import type {
@@ -56,40 +56,35 @@ export class DrizzleGameSystemQueries implements GameSystemQueries, GameSystemRe
     options?: { includeArchived?: boolean },
   ): Promise<GameSystemSummaryDTO[]> {
     const rows = await this.db
-      .select()
+      .select({
+        id: gameSystems.id,
+        organizationId: gameSystems.organizationId,
+        name: gameSystems.name,
+        slug: gameSystems.slug,
+        type: gameSystems.type,
+        defaultCapacity: gameSystems.defaultCapacity,
+        notes: gameSystems.notes,
+        status: gameSystems.status,
+        activeEventCount: sql<number>`count(${events.id})`,
+      })
       .from(gameSystems)
+      .leftJoin(events, and(
+        eq(events.organizationId, organizationId),
+        eq(events.status, "published"),
+        or(
+          eq(events.gameSystemId, gameSystems.id),
+          and(isNull(events.gameSystemId), eq(events.gameSystemLabel, gameSystems.name)),
+        ),
+      ))
       .where(
         options?.includeArchived
           ? eq(gameSystems.organizationId, organizationId)
           : and(eq(gameSystems.organizationId, organizationId), eq(gameSystems.status, "active")),
-      );
+      )
+      .groupBy(gameSystems.id);
 
-    const summaries = await Promise.all(
-      rows.map(async (row) => {
-        const activeEvents = await this.db
-          .select({ id: events.id })
-          .from(events)
-          .where(
-            and(
-              eq(events.organizationId, organizationId),
-              eq(events.gameSystemLabel, row.name),
-              eq(events.status, "published"),
-            ),
-          );
-
-        return {
-          id: row.id,
-          name: row.name,
-          slug: row.slug,
-          type: row.type,
-          defaultCapacity: row.defaultCapacity,
-          activeEventCount: activeEvents.length,
-          notes: row.notes,
-          status: row.status,
-        };
-      }),
-    );
-
-    return summaries.sort((first, second) => first.name.localeCompare(second.name));
+    return rows
+      .map((row) => ({ ...row, activeEventCount: Number(row.activeEventCount) }))
+      .sort((first, second) => first.name.localeCompare(second.name));
   }
 }

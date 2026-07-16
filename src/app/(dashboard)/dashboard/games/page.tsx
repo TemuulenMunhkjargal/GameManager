@@ -1,13 +1,11 @@
 import { Gamepad2 } from "lucide-react";
-import { container, DEFAULT_ORGANIZATION_ID, resolveActor } from "@/infrastructure/container";
+import { container, DEFAULT_ORGANIZATION_ID } from "@/infrastructure/container";
 import { AddGameSystemForm } from "./add-game-system-form";
 import { ArchiveGameSystemButton } from "./archive-game-system-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function GameSystemsPage() {
-  const actor = await resolveActor(DEFAULT_ORGANIZATION_ID);
-  const canManage = actor?.membership?.canManageEvents() ?? false;
   const systems = await container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID, {
     includeArchived: true,
   });
@@ -23,7 +21,7 @@ export default async function GameSystemsPage() {
             formats, capacities, rules, and registration defaults.
           </p>
         </div>
-        {canManage ? <AddGameSystemForm /> : null}
+        <AddGameSystemForm />
       </div>
 
       <section className="grid columns-3" aria-label="Game system stats">
@@ -76,14 +74,12 @@ export default async function GameSystemsPage() {
                 <small>active events</small>
               </span>
             </div>
-            {canManage ? (
-              <div className="form-actions" style={{ marginTop: 12 }}>
+            <div className="form-actions" style={{ marginTop: 12 }}>
                 <ArchiveGameSystemButton
                   gameSystemId={system.id}
                   isArchived={system.status === "archived"}
                 />
-              </div>
-            ) : null}
+            </div>
           </article>
         ))}
       </div>

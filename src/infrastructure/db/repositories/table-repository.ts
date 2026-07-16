@@ -1,12 +1,9 @@
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { TableRepository, GameTableDTO } from "../../../application/tables/ports";
 import type { OrganizationId } from "../../../domain/organizations/organization";
+import { createId } from "../../../lib/id";
 import type { Database } from "../client";
 import { gameTables, memberProfiles, tableSeats, tableSessions } from "../schema";
-
-function id(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
-}
 
 export class DrizzleTableRepository implements TableRepository {
   public constructor(private readonly db: Database) {}
@@ -15,18 +12,30 @@ export class DrizzleTableRepository implements TableRepository {
     const tables = await this.db.select().from(gameTables)
       .where(and(eq(gameTables.organizationId, organizationId), eq(gameTables.status, "active"))).orderBy(asc(gameTables.createdAt));
 
-    return Promise.all(tables.map(async (table) => {
-      const [session] = await this.db.select().from(tableSessions)
-        .where(and(eq(tableSessions.tableId, table.id), isNull(tableSessions.endedAt))).limit(1);
-      const occupants = session ? await this.db
-        .select({ id: tableSeats.id, memberProfileId: tableSeats.memberProfileId,
-          guestName: tableSeats.guestName, memberName: memberProfiles.displayName,
-          seatedAt: tableSeats.seatedAt })
-        .from(tableSeats)
-        .leftJoin(memberProfiles, eq(memberProfiles.id, tableSeats.memberProfileId))
-        .where(and(eq(tableSeats.sessionId, session.id), isNull(tableSeats.releasedAt)))
-        .orderBy(asc(tableSeats.seatedAt)) : [];
+    const tableIds = tables.map((table) => table.id);
+    const sessions = tableIds.length ? await this.db.select().from(tableSessions)
+      .where(and(inArray(tableSessions.tableId, tableIds), isNull(tableSessions.endedAt)))
+      .orderBy(asc(tableSessions.startedAt)) : [];
+    const sessionByTable = new Map(sessions.map((session) => [session.tableId, session]));
+    const sessionIds = sessions.map((session) => session.id);
+    const seats = sessionIds.length ? await this.db
+      .select({ id: tableSeats.id, sessionId: tableSeats.sessionId,
+        memberProfileId: tableSeats.memberProfileId, guestName: tableSeats.guestName,
+        memberName: memberProfiles.displayName, seatedAt: tableSeats.seatedAt })
+      .from(tableSeats)
+      .leftJoin(memberProfiles, eq(memberProfiles.id, tableSeats.memberProfileId))
+      .where(and(inArray(tableSeats.sessionId, sessionIds), isNull(tableSeats.releasedAt)))
+      .orderBy(asc(tableSeats.seatedAt)) : [];
+    const seatsBySession = new Map<string, typeof seats>();
+    for (const seat of seats) {
+      const occupants = seatsBySession.get(seat.sessionId) ?? [];
+      occupants.push(seat);
+      seatsBySession.set(seat.sessionId, occupants);
+    }
 
+    return tables.map((table) => {
+      const session = sessionByTable.get(table.id);
+      const occupants = session ? seatsBySession.get(session.id) ?? [] : [];
       return {
         id: table.id, name: table.name, capacity: table.capacity, status: table.status,
         sessionId: session?.id ?? null,
@@ -36,12 +45,12 @@ export class DrizzleTableRepository implements TableRepository {
           name: seat.memberName ?? seat.guestName ?? "Deleted player",
           seatedAt: seat.seatedAt.toISOString() })),
       };
-    }));
+    });
   }
 
   public async create(organizationId: OrganizationId, name: string, capacity: number): Promise<void> {
     this.validateTable(name, capacity);
-    await this.db.insert(gameTables).values({ id: id("table"), organizationId, name: name.trim(), capacity });
+    await this.db.insert(gameTables).values({ id: createId("table"), organizationId, name: name.trim(), capacity });
   }
 
   public async update(organizationId: OrganizationId, tableId: string, name: string, capacity: number): Promise<void> {
@@ -78,7 +87,7 @@ export class DrizzleTableRepository implements TableRepository {
 
     const sessionId = await this.ensureSession(table.id);
     await this.ensureCapacity(table.capacity, sessionId);
-    await this.db.insert(tableSeats).values({ id: id("seat"), sessionId,
+    await this.db.insert(tableSeats).values({ id: createId("seat"), sessionId,
       memberProfileId: input.memberProfileId ?? null,
       guestName: input.memberProfileId ? null : input.guestName!.trim() });
   }
@@ -98,7 +107,7 @@ export class DrizzleTableRepository implements TableRepository {
     await this.ensureCapacity(target.capacity, targetSessionId);
     const now = new Date();
     await this.db.update(tableSeats).set({ releasedAt: now }).where(eq(tableSeats.id, seat.id));
-    await this.db.insert(tableSeats).values({ id: id("seat"), sessionId: targetSessionId,
+    await this.db.insert(tableSeats).values({ id: createId("seat"), sessionId: targetSessionId,
       memberProfileId: seat.memberProfileId, guestName: seat.guestName, seatedAt: now });
     await this.endSessionIfEmpty(seat.sourceSessionId);
   }
@@ -152,7 +161,7 @@ export class DrizzleTableRepository implements TableRepository {
     const [current] = await this.db.select({ id: tableSessions.id }).from(tableSessions)
       .where(and(eq(tableSessions.tableId, tableId), isNull(tableSessions.endedAt))).limit(1);
     if (current) return current.id;
-    const sessionId = id("session");
+    const sessionId = createId("session");
     await this.db.insert(tableSessions).values({ id: sessionId, tableId });
     return sessionId;
   }

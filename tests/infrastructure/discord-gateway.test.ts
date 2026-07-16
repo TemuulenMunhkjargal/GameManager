@@ -15,4 +15,32 @@ describe("WebhookDiscordGateway league announcements", () => {
     expect(body.embeds[0]).toMatchObject({ title: "New league created", color: 0x71d09a });
     expect(body.embeds[0].fields).toEqual(expect.arrayContaining([{ name: "League", value: "Summer League", inline: true }, { name: "Game", value: "Magic: The Gathering", inline: true }]));
   });
+
+  it("rejects a non-Discord URL even when it came from restored settings", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(new WebhookDiscordGateway().sendLeagueAnnouncement({
+      webhookUrl: "http://127.0.0.1:3000/api/backups",
+      organizationName: "My Game Nights",
+      leagueName: "Summer League",
+      gameSystemLabel: "Chess",
+      headline: "League update",
+      description: "Test",
+    })).rejects.toThrow("stored Discord webhook URL is invalid");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects Discord HTTP failures so announcements are not marked sent", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 404 }));
+
+    await expect(new WebhookDiscordGateway().sendLeagueAnnouncement({
+      webhookUrl: "https://discord.com/api/webhooks/1/deleted-token",
+      organizationName: "My Game Nights",
+      leagueName: "Summer League",
+      gameSystemLabel: "Chess",
+      headline: "League update",
+      description: "Test",
+    })).rejects.toThrow("Discord rejected the webhook (404)");
+  });
 });

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRightLeft, Pencil, Plus, Trash2, UserMinus, Users, X } from "lucide-react";
 import type { GameTableDTO } from "@/application/tables/ports";
 import type { MemberSummaryDTO } from "@/application/members/ports";
+import { messageFromRequestError, requestJson } from "@/lib/api-client";
 
 function elapsed(from: string | null, now: number): string {
   if (!from) return "Ready";
@@ -35,15 +36,16 @@ export function TableBoard({ tables, members }: { tables: GameTableDTO[]; member
 
   async function request(url: string, options: RequestInit = {}) {
     setBusy(true); setError(null);
-    const response = await fetch(url, options);
-    setBusy(false);
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({})) as { error?: string };
-      setError(body.error ?? "That action could not be completed.");
+    try {
+      await requestJson(url, options);
+      router.refresh();
+      return true;
+    } catch (requestError) {
+      setError(messageFromRequestError(requestError, "That action could not be completed."));
       return false;
+    } finally {
+      setBusy(false);
     }
-    router.refresh();
-    return true;
   }
 
   async function addTable(event: React.FormEvent) {

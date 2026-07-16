@@ -7,15 +7,13 @@ import { formatDateTime, formatMoney } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardOverviewPage() {
-  const summary = await container.dashboard.getSummary(DEFAULT_ORGANIZATION_ID);
-  const settings = await container.settings.get(DEFAULT_ORGANIZATION_ID);
-  const allEvents = await container.events.listForOrganization(DEFAULT_ORGANIZATION_ID);
-  const now = new Date();
-  const events = allEvents.filter((event) => event.status !== "cancelled" && new Date(event.endsAt) >= now).slice(0, 4);
-  const gameSystems = (await container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID)).slice(
-    0,
-    4,
-  );
+  const [summary, settings, allGameSystems] = await Promise.all([
+    container.dashboard.getSummary(DEFAULT_ORGANIZATION_ID),
+    container.settings.get(DEFAULT_ORGANIZATION_ID),
+    container.gameSystems.listForOrganization(DEFAULT_ORGANIZATION_ID),
+  ]);
+  const events = summary.upcomingEvents.slice(0, 4);
+  const gameSystems = allGameSystems.slice(0, 4);
 
   return (
     <>
@@ -37,11 +35,11 @@ export default async function DashboardOverviewPage() {
       <section className="grid columns-3" aria-label="Dashboard stats">
         <div className="panel stat">
           <p className="stat-label">Upcoming events</p>
-          <p className="stat-value">{summary.upcomingEvents}</p>
+          <p className="stat-value">{summary.upcomingEvents.length}</p>
         </div>
         <div className="panel stat">
           <p className="stat-label">Players</p>
-          <p className="stat-value">{summary.activeMembers}</p>
+          <p className="stat-value">{summary.activeMemberCount}</p>
         </div>
         <div className="panel stat">
           <p className="stat-label">Planned entry fees</p>

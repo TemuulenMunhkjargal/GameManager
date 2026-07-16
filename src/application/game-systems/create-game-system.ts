@@ -1,14 +1,11 @@
 import { GameSystem } from "../../domain/game-systems/game-system";
 import type { GameSystemType } from "../../domain/game-systems/game-system";
-import type { Membership } from "../../domain/organizations/membership";
 import type { OrganizationId } from "../../domain/organizations/organization";
 import type { Result } from "../../domain/shared/result";
-import { requireEventManagement } from "../shared/authorization";
 import type { GameSystemRepository } from "./ports";
 
 export type CreateGameSystemCommand = {
   organizationId: OrganizationId;
-  actorMembership: Membership | null;
   name: string;
   type: GameSystemType;
   defaultCapacity: number;
@@ -22,12 +19,6 @@ export class CreateGameSystemUseCase {
   ) {}
 
   public async execute(command: CreateGameSystemCommand): Promise<Result<GameSystem>> {
-    const authorization = requireEventManagement(command.actorMembership);
-
-    if (!authorization.ok) {
-      return authorization;
-    }
-
     const result = GameSystem.create({
       id: this.createId(),
       organizationId: command.organizationId,

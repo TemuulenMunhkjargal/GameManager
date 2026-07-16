@@ -1,23 +1,16 @@
 import { Announcement } from "../../domain/communications/announcement";
-import type { AnnouncementAudience } from "../../domain/communications/announcement";
-import type { Membership } from "../../domain/organizations/membership";
 import { failure, success, type Result } from "../../domain/shared/result";
 import type { EventId } from "../../domain/events/event";
 import type { OrganizationId } from "../../domain/organizations/organization";
 import type { EventRepository } from "../events/ports";
-import { requireEventManagement } from "../shared/authorization";
 import type { AnnouncementDeliveryService } from "./announcement-delivery-service";
 import type { AnnouncementRepository } from "./ports";
 
 export type SendEventAnnouncementCommand = {
   organizationId: OrganizationId;
-  actorMembership: Membership | null;
   eventId: EventId;
   subject: string;
   body: string;
-  audience: AnnouncementAudience;
-  /** Whether to also post to Discord if a webhook is configured. */
-  notifyDiscord: boolean;
   /** If set (and in the future), the announcement is scheduled instead of sent immediately. */
   scheduledFor: Date | null;
 };
@@ -31,12 +24,6 @@ export class SendEventAnnouncementUseCase {
   ) {}
 
   public async execute(command: SendEventAnnouncementCommand): Promise<Result<Announcement>> {
-    const authorization = requireEventManagement(command.actorMembership);
-
-    if (!authorization.ok) {
-      return authorization;
-    }
-
     const subject = command.subject.trim();
     const body = command.body.trim();
 
@@ -60,12 +47,12 @@ export class SendEventAnnouncementUseCase {
       event.id,
       subject,
       body,
-      command.audience,
+      "organization_members",
       "draft",
       null,
       0,
       null,
-      command.notifyDiscord,
+      true,
     );
 
     if (command.scheduledFor) {
